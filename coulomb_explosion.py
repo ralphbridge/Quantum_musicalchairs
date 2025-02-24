@@ -37,7 +37,7 @@ def GPU_matrix_method(pos,q):
     return k_cp * cp.sum((( cp.tile(pos,len(pos)).reshape((len(pos),len(pos),3)) - cp.tile(pos,(len(pos),1,1))) * q.reshape(len(q),1)).T * dist_mod, axis = 1).T
 
 particles = np.array([[1,0,0],[2,1,0],[2,2,0],[1,1,1],[0,1,0],[0,0,1],[0,1,1],[1,0,1],[-1,0,0],[-1,0,1],[-1,-1,0],[-1,0,1],[-1,0,-1],[-1,-1,-1]]) # location of each particle
-q = np.array([1,1,1,-1,2,-2,1.5,-1.5,0.5,-0.5,]) # charge of each particle
+q = np.array([1,1,1,-1,2,-2,1.5,-1.5,0.5,-0.5,-0.3,-1,0.32,0.98]) # charge of each particle
 
 E_for=for_method(particles,q)
 E_cpu=CPU_matrix_method(particles,q)
@@ -46,3 +46,7 @@ E_gpu=GPU_matrix_method(particles,q)
 print(E_for)
 print(E_cpu)
 print(E_gpu)
+
+np.savetxt('test.txt',E_for,fmt='%d')
+np.savetxt('test.txt',E_cpu,fmt='%d')
+np.savetxt('test.txt',E_gpu,fmt='%d')
