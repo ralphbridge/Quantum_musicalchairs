@@ -46,5 +46,3 @@ E_gpu=GPU_matrix_method(particles,q)
 print(E_for)
 print(E_cpu)
 print(E_gpu)
-
-Test
