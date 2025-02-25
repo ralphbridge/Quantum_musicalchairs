@@ -46,7 +46,3 @@ E_gpu=GPU_matrix_method(particles,q)
 print(E_for)
 print(E_cpu)
 print(E_gpu)
-
-np.savetxt('test.txt',E_for,fmt='%d')
-np.savetxt('test.txt',E_cpu,fmt='%d')
-np.savetxt('test.txt',E_gpu,fmt='%d')
