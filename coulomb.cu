@@ -22,10 +22,9 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define N 1000 // Number of electrons
 
-#define coq 1 // Trajectories ON(1) or OFF(0)
+#define steps 300000 // Maximum alloed number of steps to kill simulation
 
-#define steps 30000
-__device__ double dev_traj[6*steps*N]; // Record single paths (quantum only)
+__device__ double dev_traj[6*steps*N]; // Record single paths (both positions and velocities)
 
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -33,57 +32,34 @@ __constant__ double m; // electron rest mass
 __constant__ double hbar; // Planck's constant
 __constant__ double c; // velocity of light in vacuum
 __constant__ double eps0;
-__constant__ double v0; // electron velocity before laser region
+__constant__ double v0; // electron velocity in the z direction
 __constant__ double sigma; // electron beam standard deviation
 __constant__ double sigma_p; // electron beam transverse momentum standard deviation
 
-__constant__ double wL; // Laser frequency
-__constant__ double kL; // kL=wL/c
-__constant__ double lamL; // lamL=2pi/kL
+__constant__ double zdet; // Detector position
 
-__constant__ double wR; // ZPF frequency (resonance)
-__constant__ double kR; // kR=wR/c
-__constant__ double lamR; // lamR=2pi/kR
+__constant__ double rmin;
+__constant__ double rmax;
 
-__constant__ double E0L; // Laser electric field intensity amplitude
-__constant__ double D; // Laser beam waist
-__constant__ double zimp; // Screen position (origin set right before laser region)
-__constant__ double sigmaL; // laser region standard deviation
+__constant__ double dt; // time step for the electron trajectory
 
-__constant__ double damping; // Damping rate (harmonic oscillator approximation)
-__constant__ double Delta; // thickness of the spherical shell in k-space using resonance frequency
-__constant__ double kmin;
-__constant__ double kmax;
-__constant__ double V; // Estimated total volume of space
+void onHost(); // Main CPU function
+void onDevice(double *r,double *theta,double *phi)//,double *v_init,double *detector); // Main GPU function
 
-__constant__ double dt; // time step necessary to resolve the electron trajectory
-
-__constant__ double xi[Nk]; // Polarization angles (one for each k-mode, Nk in total): Random, allocated in CONSTANT memory for optimization purposes
-
-void onHost();
-void onDevice(double *k,double *theta,double *phi,double *eta,double *angles,double *xi,double *init,double *v_init,double *screen);
-
-__global__ void setup_kmodes(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
-__global__ void kmodes(double *x,curandState *state,int option,int n);
+__global__ void setup_randoms(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
+__global__ void positions(double *x,curandState *state,int option,int n);
 __global__ void paths_euler(double *k,double *angles,double *pos);
 
-__device__ double f(double const &k,double const &theta,double const &phi,double const &eta1,double const &eta2,double &xi,double const &t,double const &x,double const &y,double const &z,double const &vy,double const &vz);
-__device__ double g(double const &k,double const &theta,double const &phi,double const &eta1,double const &eta2,double &xi,double const &t,double const &x,double const &y,double const &z,double const &vx,double const &vz);
-__device__ double gL(double const &t,double const &y,double const &z,double const &vz);
-__device__ double h(double const &k,double const &theta,double const &phi,double const &eta1,double const &eta2,double &xi,double const &t,double const &x,double const &y,double const &z,double const &vx,double const &vy);
-__device__ double hL(double const &t,double const &y,double const &z,double const &vy);
+__device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
-__device__ unsigned int dev_count[N];
-
-__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,int const &idx){
+__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<steps){
 		dev_traj[6*steps*idx+6*dev_count[idx]]=x;
 		dev_traj[6*steps*idx+6*dev_count[idx]+1]=y;
 		dev_traj[6*steps*idx+6*dev_count[idx]+2]=z;
 		dev_traj[6*steps*idx+6*dev_count[idx]+3]=vx;
 		dev_traj[6*steps*idx+6*dev_count[idx]+4]=vy;
-		dev_traj[6*steps*idx+6*dev_count[idx]+5]=vz;
-		//dev_traj[7*steps*idx+7*dev_count[idx]+6]=idx;
+		dev_traj[6*steps*idx+6*dev_count[idx]+5]=vz;	
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error (in pushback)\n");
@@ -114,8 +90,8 @@ void onHost(){
 
 	printf("The current time is %s",asctime(timeinfo));
 	
-	const char* name_k="k-vectors";
-	const char* name_p="screen";
+	const char* name_x1="initialpositions";
+	const char* name_x2="positions";
 	const char* format=".txt";
 
 	char day[10];
@@ -124,51 +100,41 @@ void onHost(){
 
 	char strtmp[6];
 
-	char filename_k[512];
-	char filename_p[512];
+	char filename_x1[512];
+	char filename_x2[512];
 
 	std::copy(asctime(timeinfo)+4,asctime(timeinfo)+7,strtmp);
 
-	sprintf(filename_k,"%s%s%s%s",name_k,strtmp,day,format);
-	sprintf(filename_p,"%s%s%s%s",name_p,strtmp,day,format);
+	sprintf(filename_x1,"%s%s%s%s",name_x1,strtmp,day,format);
+	sprintf(filename_x2,"%s%s%s%s",name_x2,strtmp,day,format);
 
-	double *k_h,*theta_h,*phi_h; // Spherical coordinates for each k-mode (Nk in total)
-	double *eta_h; // Random phases for the ZPF k-modes (Nk in total) <--- Following Boyer's work
-	double *angles_h; // Single vector for the theta, phi and eta random numbers (3Nk in length for optimization purposes)
-	double *xi_h; // Polarization angles in host space
-	double *init_h; // Initial positions (h indicates host allocation)
-	double *v_init_h; // Initial transverse velocities
-	double *screen_h; // Single vector for the initial position, initial transverse velocities and final positions (3N in length for optimization purposes)
+	double *r_h,*theta_h,*phi_h; // Spherical coordinates for each particle's initial positions (N in total)
+	double *v_init_h; // Initial transverse velocities, vector of size 3N
+	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)
 
-	k_h=(double*)malloc(Nk*sizeof(double));
-	theta_h=(double*)malloc(Nk*sizeof(double));
-	phi_h=(double*)malloc(Nk*sizeof(double));
+	r_h=(double*)malloc(N*sizeof(double));
+	theta_h=(double*)malloc(N*sizeof(double));
+	phi_h=(double*)malloc(N*sizeof(double));
 
-	eta_h=(double*)malloc(2*Nk*sizeof(double));
+//	v_init_h=(double*)malloc(3*N*sizeof(double));
 
-	angles_h=(double*)malloc(5*Nk*sizeof(double));
+//	detector_h=(double*)malloc(6*N*sizeof(double));
 
-	xi_h=(double*)malloc(Nk*sizeof(double));
+	onDevice(r_h,theta_h,phi_h)//,v_init_h,detector_h);
 
-	init_h=(double*)malloc(N*sizeof(double));
-
-	v_init_h=(double*)malloc(N*sizeof(double));
-
-	screen_h=(double*)malloc(3*N*sizeof(double));
-
-	onDevice(k_h,theta_h,phi_h,eta_h,angles_h,xi_h,init_h,v_init_h,screen_h);
-
-	k_vec=fopen(filename_k,"w");
+	x_vec=fopen(filename_x1,"w");
 	for(int i=0;i<Nk;i++){
-		fprintf(k_vec,"%2.8e,%f,%f,%f,%f,%f\n",k_h[i],angles_h[i],angles_h[Nk+i],angles_h[2*Nk+i],angles_h[3*Nk+i],angles_h[4*Nk+i]);
+		fprintf(x_vec,"%2.8e,%f,%f\n",k_h[i],theta_h[i],phi_h[i]);
 	}
 	fclose(k_vec);
 
+	/*
 	posit=fopen(filename_p,"w");
 	for(int i=0;i<N;i++){
-		fprintf(posit,"%2.6e,%2.6e,%2.6e\n",screen_h[i],screen_h[N+i],screen_h[2*N+i]);
+		fprintf(posit,"%2.6e,%2.6e,%2.6e\n",detector_h[i],detector_h[N+i],detector_h[2*N+i]);
 	}
 	fclose(posit);
+	*/
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -176,57 +142,33 @@ void onHost(){
 	printf("Total time: %6.4f hours\n",elapsedTime*1e-3/3600.0);
 	printf("------------------------------------------------------------\n");
 
-	free(k_h);
+	free(r_h);
 	free(theta_h);
 	free(phi_h);
-	free(eta_h);
-	free(angles_h);
-	free(xi_h);
-	free(init_h);
-	free(v_init_h);
-	free(screen_h);
+//	free(v_init_h);
+//	free(detector_h);
 }
 
-void onDevice(double *k_h,double *theta_h,double *phi_h,double *eta_h,double *angles_h,double *xi_h,double *init_h,double *v_init_h,double *screen_h){
-	unsigned int blocks=(Nk+TPB-1)/TPB;
+void onDevice(double *r_h,double *theta_h,double *phi_h){
+	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
 	double q_h=1.6e-19;
 	double m_h=9.10938356e-31;
-	double hbar_h=1.0545718e-34; // Quantum results
-//	double hbar_h=0; // Classical results
+	double hbar_h=1.0545718e-34;
 	double c_h=299792458.0;
 	double eps0_h=8.85e-12;
 	double v0_h=1.1e7;
-	double fwhm_h=25e-6;
-	double sigma_h=fwhm_h/(2.0*sqrt(2.0*log(2.0)));
 
-	double lamL_h=532e-9;
-	double kL_h=2*pi_h/lamL_h;
-	double wL_h=kL_h*c_h;
+	double sigma_p_h=0.05*m_h*v0_h;
+	double sigma_theta_p_h=0.01;
 
-	double sigma_p_h=4.0*pi_h*(1.0545718e-34)/(lamL_h*sqrt(2.0*log(2.0)));
+	double zdet_h=10e-2;
 
-	double lamR_h=lamL_h;
-//	double lamR_h=2*pi_h*hbar_h/(m_h*v0_h);
-	double kR_h=2*pi_h/lamR_h;
-	double wR_h=kR_h*c_h;
+	double rmin_h=1e-6;
+	double rmax_h=0.01e-6;
 
-	double IL=1e14;
-	double E0L_h=pow(2.0*IL/(c_h*eps0_h),0.5);
-	double D_h=125e-6;
-	double zimp_h=24e-2+D_h;
-	double sigmaL_h=9.8e-6;
-
-	double damping_h=6.245835e-24;
-	double Delta_h=9e7*damping_h*pow(wR_h,2.0);
-	double kmin_h=(wR_h-Delta_h/2.0)/c_h;
-	double kmax_h=(wR_h+Delta_h/2.0)/c_h;
-	double Vk_h=4.0*pi_h*(pow(kmax_h,3.0)-pow(kmin_h,3.0))/3.0;
-	double V_h=pow(2.0*pi_h,3.0)*Nk/Vk_h;
-
-	double dt_h=pi_h/(1.5*wR_h);
-//	double dt_h=1.0/(0.1*wR_h);
+	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double));
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -235,143 +177,64 @@ void onDevice(double *k_h,double *theta_h,double *phi_h,double *eta_h,double *an
 	cudaMemcpyToSymbol(c,&c_h,sizeof(double));
 	cudaMemcpyToSymbol(eps0,&eps0_h,sizeof(double));
 	cudaMemcpyToSymbol(v0,&v0_h,sizeof(double));
-	cudaMemcpyToSymbol(sigma,&sigma_h,sizeof(double));
-
-	cudaMemcpyToSymbol(lamL,&lamL_h,sizeof(double));
-	cudaMemcpyToSymbol(kL,&kL_h,sizeof(double));
-	cudaMemcpyToSymbol(wL,&wL_h,sizeof(double));
 
 	cudaMemcpyToSymbol(sigma_p,&sigma_p_h,sizeof(double));
+	cudaMemcpyToSymbol(sigma_theta_p,&sigma_theta_p_h,sizeof(double));
 
-	cudaMemcpyToSymbol(lamR,&lamR_h,sizeof(double));
-	cudaMemcpyToSymbol(kR,&kR_h,sizeof(double));
-	cudaMemcpyToSymbol(wR,&wR_h,sizeof(double));
+	cudaMemcpyToSymbol(zdet,&zdet_h,sizeof(double));
 
-	cudaMemcpyToSymbol(E0L,&E0L_h,sizeof(double));
-	cudaMemcpyToSymbol(D,&D_h,sizeof(double));
-	cudaMemcpyToSymbol(zimp,&zimp_h,sizeof(double));
-	cudaMemcpyToSymbol(sigmaL,&sigmaL_h,sizeof(double));
-
-	cudaMemcpyToSymbol(damping,&damping_h,sizeof(double));
-	cudaMemcpyToSymbol(Delta,&Delta_h,sizeof(double));
-	cudaMemcpyToSymbol(kmin,&kmin_h,sizeof(double));
-	cudaMemcpyToSymbol(kmax,&kmax_h,sizeof(double));
-	cudaMemcpyToSymbol(V,&V_h,sizeof(double));
+	cudaMemcpyToSymbol(rmin,&rmin_h,sizeof(double));
+	cudaMemcpyToSymbol(rmax,&rmax_h,sizeof(double));
 
 	cudaMemcpyToSymbol(dt,&dt_h,sizeof(double));
 
-	double *k_d,*theta_d,*phi_d;
-	double *eta_d,*xi_d;
-	double *angles_d;
-	double *init_d; // Vectors in Device (d indicates device allocation)
-	double *v_init_d;
-	double *screen_d;
+	double *r_d,*theta_d,*phi_d;
+//	double *v_init_d;
+//	double *detector_d;
 
-	if(hbar_h>0.0){
-		printf("Quantum version of the KD effect: Trajectories ON\n");
-		printf("Number of particles (N): %d\n",N);
-		printf("Number of k-modes (Nk): %d\n",Nk);
-		printf("Delta=%2.6e rad/s\n",Delta_h);
-		printf("kmin=%2.6e 1/m\n",kmin_h);
-		printf("kmax=%2.6e 1/m\n",kmax_h);
-		printf("Vk=%2.6e 1/m^3\n",Vk_h);
-		printf("V=%2.6e m^3\n",V_h);
-		printf("sigmaL=%2.6e um\n",sigmaL_h);
-		printf("sigmap=%2.6e kg*m/s\n",sigma_p_h);
-	}else{
-		printf("Classical version of the KD effect: Trajectories ON\n");
-		printf("Number of particles (N): %d\n",N);
-		printf("Number of k-modes (Nk): %d\n",Nk);
-	}
-	printf("wL=%2.6e rad/s\n",wR_h);
-	printf("IL=%2.6e V/m\n",IL);
-	printf("E0L=%2.6e V/m\n",E0L_h);
+	printf("Coulomb explosion\n");
+	printf("Number of particles (N): %d\n",N);
+	printf("r_min=%2.6e m\n",kmin_h);
+	printf("r_max=%2.6e m\n",kmax_h);
+
+	printf("sigmap=%2.6e kg*m/s\n",sigma_p_h);
+	printf("sigmathetap=%f rad\n",sigma_theta_p_h);
+
 	printf("dt=%2.6e s\n",dt_h);
+	
 	printf("Threads per block: %d\n",TPB);
-	printf("Number of blocks (k-modes): %d\n",blocks);
+	printf("Number of blocks: %d\n",blocks);
 
-	cudaMalloc((void**)&k_d,Nk*sizeof(double));
-	cudaMalloc((void**)&theta_d,Nk*sizeof(double));
-	cudaMalloc((void**)&phi_d,Nk*sizeof(double));
+	cudaMalloc((void**)&r_d,N*sizeof(double));
+	cudaMalloc((void**)&theta_d,N*sizeof(double));
+	cudaMalloc((void**)&phi_d,N*sizeof(double));
 
-	cudaMalloc((void**)&eta_d,2*Nk*sizeof(double));
+/*	cudaMalloc((void**)&v_init_d,N*sizeof(double));
 
-	cudaMalloc((void**)&xi_d,Nk*sizeof(double));
+	cudaMalloc((void**)&detector_d,3*N*sizeof(double));*/
 
-	cudaMalloc((void**)&angles_d,5*Nk*sizeof(double));
+	/* Randomly generated positions inside the spherical shell */
 
-	cudaMalloc((void**)&init_d,N*sizeof(double));
+	curandState *devStates_r;
+        cudaMalloc(&devStates_r,N*sizeof(curandState));
 
-	cudaMalloc((void**)&v_init_d,N*sizeof(double));
-
-	cudaMalloc((void**)&screen_d,3*N*sizeof(double));
-
-	/* Randomly generated k-modes inside the spherical shell */
-
-	curandState *devStates_kmodes;
-        cudaMalloc(&devStates_kmodes,Nk*sizeof(curandState));
-
-	//k
+	//r
 	srand(time(0));
 	int seed=rand(); //Setting up the seeds
-	setup_kmodes<<<blocks,TPB>>>(devStates_kmodes,seed);
+	setup_r<<<blocks,TPB>>>(devStates_r,seed);
 
-	kmodes<<<blocks,TPB>>>(k_d,devStates_kmodes,1,Nk);
+	rvecs<<<blocks,TPB>>>(k_d,devStates_r,1,N);
 
 	//theta
-	kmodes<<<blocks,TPB>>>(theta_d,devStates_kmodes,2,Nk);
+	rvecs<<<blocks,TPB>>>(theta_d,devStates_r,2,N);
 
 	//phi
-	kmodes<<<blocks,TPB>>>(phi_d,devStates_kmodes,3,Nk);
+	rvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
 
 	cudaMemcpy(k_h,k_d,Nk*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_h,theta_d,Nk*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_h,phi_d,Nk*sizeof(double),cudaMemcpyDeviceToHost);
 
-	/* Randomly generated phases for the CPC modes */
-
-	curandState *devStates_eta;
-	cudaMalloc(&devStates_eta,2*Nk*sizeof(curandState));
-
-	blocks=(2*Nk+TPB-1)/TPB;
-	printf("Number of blocks (phases): %d\n",blocks);
-
-	//eta
-	srand(time(NULL));
-	seed=rand(); //Setting up seeds
-	setup_kmodes<<<blocks,TPB>>>(devStates_eta,seed);
-
-	kmodes<<<blocks,TPB>>>(eta_d,devStates_eta,6,Nk);
-
-	cudaMemcpy(eta_h,eta_d,2*Nk*sizeof(double),cudaMemcpyDeviceToHost);
-
-	blocks=(Nk+TPB-1)/TPB;
-
-	// xi
-	printf("Number of blocks (polarizations): %d\n",blocks);
-
-	kmodes<<<blocks,TPB>>>(xi_d,devStates_eta,6,Nk);
-
-	cudaMemcpy(xi_h,xi_d,Nk*sizeof(double),cudaMemcpyDeviceToHost);
-
-	cudaMemcpyToSymbol(xi,xi_h,Nk*sizeof(double));
-
-	/* Making a single vector for theta, phi and eta (reduces the size of memory, one double pointer instead of three) */
-	
-	for(int i=0;i<Nk;i++){
-		angles_h[i]=theta_h[i];
-		angles_h[Nk+i]=phi_h[i];
-		angles_h[2*Nk+i]=eta_h[i];
-		angles_h[3*Nk+i]=eta_h[i+Nk];
-		angles_h[4*Nk+i]=xi_h[i+Nk];
-	}
-
-	cudaFree(theta_d);
-	cudaFree(phi_d);
-	cudaFree(eta_d);
-	cudaFree(xi_d);
-
-	cudaMemcpy(angles_d,angles_h,5*Nk*sizeof(double),cudaMemcpyHostToDevice);
 
 	/* Initial positions and transverse momentum*/
 
@@ -383,35 +246,31 @@ void onDevice(double *k_h,double *theta_h,double *phi_h,double *eta_h,double *an
 
 	srand(time(NULL));
 	seed=rand();
-	setup_kmodes<<<blocks,TPB>>>(devStates_init,seed);
+	setup_r<<<blocks,TPB>>>(devStates_init,seed);
 
-	kmodes<<<blocks,TPB>>>(init_d,devStates_init,4,N);
+	rvecs<<<blocks,TPB>>>(init_d,devStates_init,4,N);
 	cudaMemcpy(init_h,init_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	kmodes<<<blocks,TPB>>>(v_init_d,devStates_init,5,N);
+	rvecs<<<blocks,TPB>>>(v_init_d,devStates_init,5,N);
 	cudaMemcpy(v_init_h,v_init_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	/* Making a single vector for the initial and final positions (reduces the size of memory, one double pointer instead of two) */
 
 	for(int i=0;i<N;i++){
-		screen_h[i]=init_h[i];
-		screen_h[N+i]=v_init_h[i];
-		screen_h[2*N+i]=0.0;
+		detector_h[i]=init_h[i];
+		detector_h[N+i]=v_init_h[i];
+		detector_h[2*N+i]=0.0;
 	}
 
-	cudaMemcpy(screen_d,screen_h,3*N*sizeof(double),cudaMemcpyHostToDevice);
+	cudaMemcpy(detector_d,detector_h,3*N*sizeof(double),cudaMemcpyHostToDevice);
 
 	int dsize[N];
 
-	//paths_euler<<<blocks,TPB>>>(k_d,angles_d,screen_d);
-	//paths_rk2<<<blocks,TPB>>>(k_d,angles_d,screen_d);
-	paths_rk4<<<blocks,TPB>>>(k_d,angles_d,screen_d);
+	paths_euler<<<blocks,TPB>>>(k_d,angles_d,detector_d);
 
-	//printf("Paths computed using Euler method in %6.4f hours\n",elapsedTime*1e-3/3600.0);
-	//printf("Paths computed using RK2 method in %6.4f hours\n",elapsedTime*1e-3/3600.0);
-	printf("Paths computed using RK4 method\n"); //in %6.4f hours\n",elapsedTime*1e-3/3600.0);
+	printf("Paths computed using Euler method in %6.4f hours\n",elapsedTime*1e-3/3600.0);
 	
-	cudaMemcpy(screen_h,screen_d,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(detector_h,detector_d,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	cudaMemcpyFromSymbol(&dsize,dev_count,N*sizeof(int));
 
@@ -443,22 +302,22 @@ void onDevice(double *k_h,double *theta_h,double *phi_h,double *eta_h,double *an
 		myfile.close();
 	}
 
-	cudaFree(devStates_kmodes);
+	cudaFree(devStates_r);
 	cudaFree(devStates_eta);
 	cudaFree(devStates_init);
 	cudaFree(k_d);
-	cudaFree(angles_d);
-	cudaFree(init_d);
+	cudaFree(theta_d);
+	cudaFree(phi_d);
 	cudaFree(v_init_d);
-	cudaFree(screen_d);
+	cudaFree(detector_d);
 }
 
-__global__ void setup_kmodes(curandState *state,unsigned long seed){
+__global__ void setup_r(curandState *state,unsigned long seed){
         int idx=threadIdx.x+blockIdx.x*blockDim.x;
         curand_init(seed,idx,0,&state[idx]);
 }
 
-__global__ void kmodes(double *vec,curandState *globalState,int opt,int n){
+__global__ void rvecs(double *vec,curandState *globalState,int opt,int n){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
 	if(idx<n){
