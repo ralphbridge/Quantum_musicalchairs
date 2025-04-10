@@ -73,7 +73,8 @@ int main(){
 
 void onHost(){
 
-	float elapsedTime; // Variables to record execution times
+	// This section sets up the timer to measure execution times and filenames
+	float elapsedTime;
 	cudaEvent_t start,stop;
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
@@ -108,6 +109,7 @@ void onHost(){
 	sprintf(filename_x1,"%s%s%s%s",name_x1,strtmp,day,format);
 	sprintf(filename_x2,"%s%s%s%s",name_x2,strtmp,day,format);
 
+	// This section computes the random initial position and momentum distributions
 	double *r_h,*theta_h,*phi_h; // Spherical coordinates for each particle's initial positions (N in total)
 	double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)
@@ -116,11 +118,11 @@ void onHost(){
 	theta_h=(double*)malloc(N*sizeof(double));
 	phi_h=(double*)malloc(N*sizeof(double));
 
-//	v_init_h=(double*)malloc(3*N*sizeof(double));
+	//v_init_h=(double*)malloc(3*N*sizeof(double));
 
-//	detector_h=(double*)malloc(6*N*sizeof(double));
+	//detector_h=(double*)malloc(6*N*sizeof(double));
 
-	onDevice(r_h,theta_h,phi_h)//,v_init_h,detector_h);
+	onDevice(r_h,theta_h,phi_h)//,v_init_h,detector_h); // GPU function that computes the randomly generated positions
 
 	x_vec=fopen(filename_x1,"w");
 	for(int i=0;i<Nk;i++){
@@ -145,8 +147,8 @@ void onHost(){
 	free(r_h);
 	free(theta_h);
 	free(phi_h);
-//	free(v_init_h);
-//	free(detector_h);
+	//free(v_init_h);
+	//free(detector_h);
 }
 
 void onDevice(double *r_h,double *theta_h,double *phi_h){
@@ -163,14 +165,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	double sigma_p_h=0.05*m_h*v0_h;
 	double sigma_theta_p_h=0.01;
 
-	double zdet_h=10e-2;
+	double zdet_h=10e-2; // Detector position
 
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
 	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
-	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double));
+	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
 	cudaMemcpyToSymbol(m,&m_h,sizeof(double));
 	cudaMemcpyToSymbol(hbar,&hbar_h,sizeof(double));
@@ -189,8 +191,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	cudaMemcpyToSymbol(dt,&dt_h,sizeof(double));
 
 	double *r_d,*theta_d,*phi_d;
-//	double *v_init_d;
-//	double *detector_d;
+	//double *v_init_d;
+	//double *detector_d;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -209,14 +211,15 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	cudaMalloc((void**)&theta_d,N*sizeof(double));
 	cudaMalloc((void**)&phi_d,N*sizeof(double));
 
-/*	cudaMalloc((void**)&v_init_d,N*sizeof(double));
+	/*	
+	cudaMalloc((void**)&v_init_d,N*sizeof(double));
 
 	cudaMalloc((void**)&detector_d,3*N*sizeof(double));*/
 
 	/* Randomly generated positions inside the spherical shell */
 
 	curandState *devStates_r;
-        cudaMalloc(&devStates_r,N*sizeof(curandState));
+    cudaMalloc(&devStates_r,N*sizeof(curandState));
 
 	//r
 	srand(time(0));
@@ -235,9 +238,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	cudaMemcpy(theta_h,theta_d,Nk*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_h,phi_d,Nk*sizeof(double),cudaMemcpyDeviceToHost);
 
-
 	/* Initial positions and transverse momentum*/
-
+	/*
 	curandState *devStates_init;
 	cudaMalloc(&devStates_init,N*sizeof(curandState));
 
@@ -254,8 +256,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	rvecs<<<blocks,TPB>>>(v_init_d,devStates_init,5,N);
 	cudaMemcpy(v_init_h,v_init_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	/* Making a single vector for the initial and final positions (reduces the size of memory, one double pointer instead of two) */
-
 	for(int i=0;i<N;i++){
 		detector_h[i]=init_h[i];
 		detector_h[N+i]=v_init_h[i];
@@ -263,7 +263,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	}
 
 	cudaMemcpy(detector_d,detector_h,3*N*sizeof(double),cudaMemcpyHostToDevice);
+	*/
 
+	// This section computes the time evolution of the cloud by using Euler method
+	/*
 	int dsize[N];
 
 	paths_euler<<<blocks,TPB>>>(k_d,angles_d,detector_d);
@@ -301,15 +304,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 		std::cout << '\n';
 		myfile.close();
 	}
+	*/
 
 	cudaFree(devStates_r);
-	cudaFree(devStates_eta);
-	cudaFree(devStates_init);
-	cudaFree(k_d);
+	cudaFree(r_d);
 	cudaFree(theta_d);
 	cudaFree(phi_d);
-	cudaFree(v_init_d);
-	cudaFree(detector_d);
+	//cudaFree(v_init_d);
+	//cudaFree(detector_d);
 }
 
 __global__ void setup_r(curandState *state,unsigned long seed){
