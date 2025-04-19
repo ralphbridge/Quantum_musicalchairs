@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --time=00:15:00
 #SBATCH --mem-per-cpu=1024
-#SBATCH --job-name=coulomb_cuda
+#SBATCH --job-name=cuda_coulomb
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu
-#SBATCH --error=/work/batelaan/rpuente/job.%J.err
-#SBATCH --output=/work/batelaan/rpuente/job.%J.out
+#SBATCH --error=/work/batelaan/rpuente/Quantum_musicalchairs/job.%J.err
+#SBATCH --output=/work/batelaan/rpuente/Quantum_musicalchairs/job.%J.out
 
 module load cuda
-./cuda-app.exe
+./cuda_coulomb
