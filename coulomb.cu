@@ -45,10 +45,10 @@ __constant__ double rmax;
 __constant__ double dt; // time step for the electron trajectory
 
 void onHost(); // Main CPU function
-void onDevice(double *r,double *theta,double *phi); // Main GPU function
+void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p); // Main GPU function
 
-__global__ void setup_r(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
-__global__ void rvecs(double *x,curandState *state,int option,int n);
+__global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
+__global__ void rndvecs(double *x,curandState *state,int option,int n);
 __global__ void paths_euler(double *k,double *angles,double *pos);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
@@ -112,18 +112,23 @@ void onHost(){
 
 	// This section computes the random initial position and momentum distributions
 	double *r_h,*theta_h,*phi_h; // Spherical coordinates for each particle's initial positions (N in total)
+	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
 	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
 
 	r_h=(double*)malloc(N*sizeof(double));
 	theta_h=(double*)malloc(N*sizeof(double));
 	phi_h=(double*)malloc(N*sizeof(double));
+	
+	p_h=(double*)malloc(N*sizeof(double));
+	theta_p_h=(double*)malloc(N*sizeof(double));
+	phi_p_h=(double*)malloc(N*sizeof(double));
 
-	onDevice(r_h,theta_h,phi_h); // GPU function that computes the randomly generated positions
+	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h); // GPU function that computes the randomly generated positions
 
 	x_vec=fopen(filename_x1,"w");
 	for(int i=0;i<N;i++){
-		fprintf(x_vec,"%2.8e,%f,%f\n",r_h[i],theta_h[i],phi_h[i]);
+		fprintf(x_vec,"%2.8e,%f,%f,%2.8e,%f,%f\n",r_h[i],theta_h[i],phi_h[i],p_h[i],theta_p_h[i],phi_p_h[i]);
 	}
 	fclose(x_vec);
 
@@ -136,9 +141,12 @@ void onHost(){
 	free(r_h);
 	free(theta_h);
 	free(phi_h);
+	free(p_h);
+	free(theta_p_h);
+	free(phi_p_h);
 }
 
-void onDevice(double *r_h,double *theta_h,double *phi_h){
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h){
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
@@ -178,6 +186,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	cudaMemcpyToSymbol(dt,&dt_h,sizeof(double));
 
 	double *r_d,*theta_d,*phi_d;
+	double *p_d,*theta_p_d,*phi_p_d;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -195,6 +204,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	cudaMalloc((void**)&r_d,N*sizeof(double));
 	cudaMalloc((void**)&theta_d,N*sizeof(double));
 	cudaMalloc((void**)&phi_d,N*sizeof(double));
+	
+	cudaMalloc((void**)&p_d,N*sizeof(double));
+	cudaMalloc((void**)&theta_p_d,N*sizeof(double));
+	cudaMalloc((void**)&phi_p_d,N*sizeof(double));
 
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
@@ -202,32 +215,56 @@ void onDevice(double *r_h,double *theta_h,double *phi_h){
 	//r
 	srand(time(0));
 	int seed=rand(); //Setting up the seeds
-	setup_r<<<blocks,TPB>>>(devStates_r,seed);
+	setup_rnd<<<blocks,TPB>>>(devStates_r,seed);
 
-	rvecs<<<blocks,TPB>>>(r_d,devStates_r,1,N);
+	rndvecs<<<blocks,TPB>>>(r_d,devStates_r,1,N);
 
 	//theta
-	rvecs<<<blocks,TPB>>>(theta_d,devStates_r,2,N);
+	rndvecs<<<blocks,TPB>>>(theta_d,devStates_r,2,N);
 
 	//phi
-	rvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
+	rndvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
 
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	
+	curandState *devStates_p;
+	cudaMalloc(&devStates_p,N*sizeof(curandState));
+	
+	//p
+	srand(time(NULL));
+	int seed=rand(); //Setting up the seeds
+	setup_rnd<<<blocks,TPB>>>(devStates_p,seed);
+
+	rndvecs<<<blocks,TPB>>>(p_d,devStates_p,4,N);
+
+	//theta_p
+	rndvecs<<<blocks,TPB>>>(theta_p_d,devStates_p,5,N);
+
+	//phi_p
+	rndvecs<<<blocks,TPB>>>(phi_p_d,devStates_p,6,N);
+
+	cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
 	cudaFree(theta_d);
 	cudaFree(phi_d);
+	cudaFree(devStates_p);
+	cudaFree(p_d);
+	cudaFree(theta_p_d);
+	cudaFree(phi_p_d);
 }
 
-__global__ void setup_r(curandState *state,unsigned long seed){
+__global__ void setup_rnd(curandState *state,unsigned long seed){
         int idx=threadIdx.x+blockIdx.x*blockDim.x;
         curand_init(seed,idx,0,&state[idx]);
 }
 
-__global__ void rvecs(double *vec,curandState *globalState,int opt,int n){
+__global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
 	if(idx<n){
@@ -237,11 +274,11 @@ __global__ void rvecs(double *vec,curandState *globalState,int opt,int n){
 			vec[idx]=acos(1.0-2.0*curand_uniform(&localState));
 		}else if(opt==3){ // Random azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
-		}else if(opt==4){
-			vec[idx]=sigma*curand_normal(&localState); // Random initial positions
-		}else if(opt==5){
-			vec[idx]=sigma_p*curand_normal(&localState); // Random initial transverse momentum
-		}else if(opt==6){
+		}else if(opt==4){ // Random momenta magnitude
+			vec[idx]=sigma_p*curand_normal(&localState)+m*v0;
+		}else if(opt==5){ // Random momentum polar angles
+			vec[idx]=sigma_theta_p*curand_normal(&localState);
+		}else if(opt==6){ // Random momentum azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}
 		globalState[idx]=localState; // Update current seed state
