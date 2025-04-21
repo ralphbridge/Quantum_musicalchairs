@@ -187,6 +187,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	double *r_d,*theta_d,*phi_d;
 	double *p_d,*theta_p_d,*phi_p_d;
+	double *r,*p;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -208,6 +209,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&p_d,N*sizeof(double));
 	cudaMalloc((void**)&theta_p_d,N*sizeof(double));
 	cudaMalloc((void**)&phi_p_d,N*sizeof(double));
+	
+	cudaMalloc((void**)&r,3*N*sizeof(double));
+	cudaMalloc((void**)&p,3*N*sizeof(double));
 
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
@@ -261,10 +265,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 __global__ void setup_rnd(curandState *state,unsigned long seed){
         int idx=threadIdx.x+blockIdx.x*blockDim.x;
-        curand_init(seed,idx,0,&state[idx]);
+        curand_init(seed,idx,0,&state[idx]); // Initializes the random state
 }
 
-__global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){
+__global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // Random number generation
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
 	if(idx<n){
