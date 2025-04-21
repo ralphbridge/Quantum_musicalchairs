@@ -234,7 +234,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	//p
 	srand(time(NULL));
-	int seed=rand(); //Setting up the seeds
+	seed=rand(); //Setting up the seeds <---- check if this is necessary
 	setup_rnd<<<blocks,TPB>>>(devStates_p,seed);
 
 	rndvecs<<<blocks,TPB>>>(p_d,devStates_p,4,N);
