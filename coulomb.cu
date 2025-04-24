@@ -287,4 +287,4 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 		}
 		globalState[idx]=localState; // Update current seed state
 	}
-} //Hello
+} //Hello it's me again
