@@ -50,6 +50,8 @@ void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,doub
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
 __global__ void paths_euler(double *k,double *angles,double *pos);
+__global__ void positions(double *vec,double *r,double *theta,double *phi,int opt);
+__global__ void Efield(double *pos,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
@@ -187,7 +189,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	double *r_d,*theta_d,*phi_d;
 	double *p_d,*theta_p_d,*phi_p_d;
-	double *r,*p;
+	double *r,*p,*E;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -254,9 +256,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
-	positions<<<blocks,TPB>>>(r,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+	positions<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
-	positions<<<blocks,TPB>>>(p,2); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
+	positions<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,2); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
 	Efield<<<blocks,TPB>>>(r,E);
 
@@ -299,17 +301,17 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 	}
 }
 
-__global__ void positions(double *vec,int opt){
+__global__ void positions(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
 		if(opt==1){
-			vec[idx]=r_d[idx]*sin(theta_d[idx])*cos(phi_d[idx]);
-			vec[idx+1]=r_d[idx]*sin(theta_d[idx])*sin(phi_d[idx]);
-			vec[idx+2]=r_d[idx]*cos(theta_d[idx]);
+			vec[idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+			vec[idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
+			vec[idx+2]=r[idx]*cos(theta[idx]);
 		}else{
-			vec[idx]=p_d[idx]*sin(theta_p_d[idx])*cos(phi_p_d[idx]);
-			vec[idx+1]=p_d[idx]*sin(theta_p_d[idx])*sin(phi_p_d[idx]);
-			vec[idx+2]=p_d[idx]*cos(theta_p_d[idx]);
+			vec[idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+			vec[idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
+			vec[idx+2]=r[idx]*cos(theta[idx]);
 		}
 	}
 }
@@ -317,7 +319,7 @@ __global__ void positions(double *vec,int opt){
 __global__ void Efield(double *pos,double *E){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
-		for(int i=0,N,i++){
+		for(int i=0;i<N;i++){
 			if(i!=idx){
 				E[idx]=pos[i]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
 				E[idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
