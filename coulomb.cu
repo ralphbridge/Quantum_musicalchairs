@@ -256,9 +256,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
-	positions<<<blocks,TPB>>>(r,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+	positions<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
-	positions<<<blocks,TPB>>>(p,2); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
+	positions<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,2); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
 	Efield<<<blocks,TPB>>>(r,E);
 
