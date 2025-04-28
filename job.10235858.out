@@ -1,4 +1,4 @@
-The current time is Thu Apr 24 13:33:28 2025
+The current time is Mon Apr 28 16:51:50 2025
 Coulomb explosion
 Number of particles (N): 1000
 r_min=1.000000e-06 m
@@ -8,5 +8,5 @@ sigmathetap=0.010000 rad
 dt=9.090909e-11 s
 Threads per block: 256
 Number of blocks: 4
-Total time: 0.0001 hours
+Total time: 0.0000 hours
 ------------------------------------------------------------
