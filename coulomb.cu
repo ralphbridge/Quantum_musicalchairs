@@ -50,6 +50,8 @@ void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,doub
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
 __global__ void paths_euler(double *k,double *angles,double *pos);
+__global__ void positions(double *vec,double *r,double *theta,double *phi,int opt);
+__global__ void Efield(double *pos,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
@@ -73,6 +75,7 @@ int main(){
 }
 
 void onHost(){
+
 	// This section sets up the timer to measure execution times and filenames
 	float elapsedTime;
 	cudaEvent_t start,stop;
@@ -100,7 +103,6 @@ void onHost(){
 	strftime(day, sizeof(day)-1, "%d_%H_%M", timeinfo);
 
 	char strtmp[6];
-
 
 	char filename_x1[512];
 	char filename_x2[512];
@@ -187,7 +189,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	double *r_d,*theta_d,*phi_d;
 	double *p_d,*theta_p_d,*phi_p_d;
-	double *r,*p;
+	double *r,*p,*E;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -212,6 +214,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	cudaMalloc((void**)&r,3*N*sizeof(double));
 	cudaMalloc((void**)&p,3*N*sizeof(double));
+	cudaMalloc((void**)&E,3*N*sizeof(double));
 
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
@@ -237,7 +240,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc(&devStates_p,N*sizeof(curandState));
 	
 	//p
-	srand(time(NULL));
+	srand(time(NULL)); // <---- check if this is necessary
 	seed=rand(); //Setting up the seeds <---- check if this is necessary
 	setup_rnd<<<blocks,TPB>>>(devStates_p,seed);
 
@@ -252,6 +255,12 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	
+	positions<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+	
+	positions<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,2); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
+	
+	Efield<<<blocks,TPB>>>(r,E);
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
@@ -261,6 +270,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaFree(p_d);
 	cudaFree(theta_p_d);
 	cudaFree(phi_p_d);
+	cudaFree(r);
+	cudaFree(p);
+	cudaFree(E);
 }
 
 __global__ void setup_rnd(curandState *state,unsigned long seed){
@@ -287,4 +299,32 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 		}
 		globalState[idx]=localState; // Update current seed state
 	}
-} //Hello it's me again
+}
+
+__global__ void positions(double *vec,double *r,double *theta,double *phi,int opt){
+	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+	if(idx<N){
+		if(opt==1){
+			vec[idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+			vec[idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
+			vec[idx+2]=r[idx]*cos(theta[idx]);
+		}else{
+			vec[idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+			vec[idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
+			vec[idx+2]=r[idx]*cos(theta[idx]);
+		}
+	}
+}
+
+__global__ void Efield(double *pos,double *E){
+	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+	if(idx<N){
+		for(int i=0;i<N;i++){
+			if(i!=idx){
+				E[idx]=pos[i]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+				E[idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+				E[idx+2]=pos[i+2]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+			}
+		}
+	}
+}
