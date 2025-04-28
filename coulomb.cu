@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 1000 // Number of electrons
+#define N 3 // Number of electrons
 
 #define steps 300000 // Maximum alloed number of steps to kill simulation
 
@@ -45,7 +45,7 @@ __constant__ double rmax;
 __constant__ double dt; // time step for the electron trajectory
 
 void onHost(); // Main CPU function
-void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p); // Main GPU function
+void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E_h); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
@@ -84,7 +84,7 @@ void onHost(){
 
 	cudaEventRecord(start,0);
 
-	FILE *x_vec; //,*posit=NULL;
+	FILE *x_vec,*E_vec;
 
 	time_t rawtime;
 	struct tm*timeinfo;
@@ -95,7 +95,7 @@ void onHost(){
 	printf("The current time is %s",asctime(timeinfo));
 	
 	const char* name_x1="initialpositions";
-	const char* name_x2="positions";
+	const char* name_x2="Efield";
 	const char* format=".txt";
 
 	char day[10];
@@ -115,6 +115,7 @@ void onHost(){
 	// This section computes the random initial position and momentum distributions
 	double *r_h,*theta_h,*phi_h; // Spherical coordinates for each particle's initial positions (N in total)
 	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
+	double *E_h; // Electric field (just for debugging)
 	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
 
@@ -125,14 +126,22 @@ void onHost(){
 	p_h=(double*)malloc(N*sizeof(double));
 	theta_p_h=(double*)malloc(N*sizeof(double));
 	phi_p_h=(double*)malloc(N*sizeof(double));
+	
+	E_h=(double*)malloc(3*N*sizeof(double));
 
-	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h); // GPU function that computes the randomly generated positions
+	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h); // GPU function that computes the randomly generated positions
 
 	x_vec=fopen(filename_x1,"w");
 	for(int i=0;i<N;i++){
 		fprintf(x_vec,"%2.8e,%f,%f,%2.8e,%f,%f\n",r_h[i],theta_h[i],phi_h[i],p_h[i],theta_p_h[i],phi_p_h[i]);
 	}
 	fclose(x_vec);
+	
+	E_vec=fopen(filename_x2,"w");
+	for(int i=0;i<N;i=i+3){
+		fprintf(E_vec,"%2.8e,%2.8e,%2.8e\n",E_h[i],E_h[i+1],E_h[i+2]);
+	}
+	fclose(E_vec);
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -146,9 +155,10 @@ void onHost(){
 	free(p_h);
 	free(theta_p_h);
 	free(phi_p_h);
+	free(E_h);
 }
 
-void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h){
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h){
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
@@ -167,7 +177,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
-	double dt_h=zdet_h/(100*v0_h); // Think about time step
+	double dt_h=zdet_h/(1000*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -189,7 +199,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	double *r_d,*theta_d,*phi_d;
 	double *p_d,*theta_p_d,*phi_p_d;
-	double *r,*p,*E;
+	double *r,*p;
+	double *E;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -214,6 +225,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	cudaMalloc((void**)&r,3*N*sizeof(double));
 	cudaMalloc((void**)&p,3*N*sizeof(double));
+	cudaMalloc((void**)&E,3*N*sizeof(double));
+	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
 
 	curandState *devStates_r;
@@ -260,7 +273,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	positions<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,2); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
+	//E field (for debugging only)
 	Efield<<<blocks,TPB>>>(r,E);
+	
+	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
@@ -305,13 +321,13 @@ __global__ void positions(double *vec,double *r,double *theta,double *phi,int op
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
 		if(opt==1){
-			vec[idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
-			vec[idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
-			vec[idx+2]=r[idx]*cos(theta[idx]);
+			vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+			vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
+			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}else{
-			vec[idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
-			vec[idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
-			vec[idx+2]=r[idx]*cos(theta[idx]);
+			vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+			vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
+			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
 	}
 }
@@ -321,9 +337,9 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[idx]=pos[i]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
-				E[idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
-				E[idx+2]=pos[i+2]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+				E[3*idx]=pos[i]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+				E[3*idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+				E[3*idx+2]=pos[i+2]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
 			}
 		}
 	}
