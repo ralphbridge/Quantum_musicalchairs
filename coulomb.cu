@@ -138,7 +138,7 @@ void onHost(){
 	fclose(x_vec);
 	
 	E_vec=fopen(filename_x2,"w");
-	for(int i=0;i<N;i=i+3){
+	for(int i=0;i<3*N;i=i+3){
 		fprintf(E_vec,"%2.8e,%2.8e,%2.8e\n",E_h[i],E_h[i+1],E_h[i+2]);
 	}
 	fclose(E_vec);
