@@ -353,40 +353,24 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		double yn=r[3*idx+1];
 		double zn=r[3*idx+2];
 
-		double vxn=p[3*idx];
-		double vyn=p[3*idx+1];
 		__syncthreads();
-		double vzn=v0+p[3*idx+2];
+		double vxn=p[3*idx]/m;
+		__syncthreads();
+		double vyn=p[3*idx+1]/m;
+		__syncthreads();
+		double vzn=v0+p[3*idx+2]/m;
 
 		if(t==0){
 			my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 		}
 
 		while(zn<=D){
-			vxnn[threadIdx.x]=0.0;
-			vynn[threadIdx.x]=0.0;
-			vznn[threadIdx.x]=0.0;
-
-			for(int i=0;i<Nk;i++){
-				__syncthreads();
-				vxnn[threadIdx.x]=vxnn[threadIdx.x]+f(k[i],angles[i],angles[Nk+i],angles[2*Nk+i],angles[3*Nk+i],xi[i],tn,xn,yn,zn,vyn,vzn); // vxnn represents here the total ZPF force in x (recycled variable)
-				__syncthreads();
-				vynn[threadIdx.x]=vynn[threadIdx.x]+g(k[i],angles[i],angles[Nk+i],angles[2*Nk+i],angles[3*Nk+i],xi[i],tn,xn,yn,zn,vxn,vzn); // k1vy represents here the total ZPF force in y
-				
-				__syncthreads();
-				vznn[threadIdx.x]=vznn[threadIdx.x]+h(k[i],angles[i],angles[Nk+i],angles[2*Nk+i],angles[3*Nk+i],xi[i],tn,xn,yn,zn,vxn,vyn); // k1vz represents here the total ZPF force in z
-			}
-			vynn[threadIdx.x]=vynn[threadIdx.x]+gL(tn,yn,zn,vzn);
-			vznn[threadIdx.x]=vznn[threadIdx.x]+hL(tn,yn,zn,vyn);
-
 			__syncthreads();
-			vxnn[threadIdx.x]=vxn+dt*vxnn[threadIdx.x];
-
+			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // vxnn represents here the total force in x
 			__syncthreads();
-			vynn[threadIdx.x]=vyn+dt*vynn[threadIdx.x];
-
+			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m; // vynn represents here the total force in y
 			__syncthreads();
-			vznn[threadIdx.x]=vzn+dt*vznn[threadIdx.x];
+			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m; // vznn represents here the total force in z
 
 			__syncthreads();
 			tn=tn+dt;
@@ -404,12 +388,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			vyn=vynn[threadIdx.x];
 			vzn=vznn[threadIdx.x];
 
-			if(zn[idx]>zdet){
+			if(znn[idx]>=zdet){
 				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 			}
-
 		}
 		__syncthreads();
-		pos[2*N+idx]=yn+(zimp-D)*vyn/vzn;
+		// Search online how to call a GPU kernel from another GPU Kernel
 	}
 }
