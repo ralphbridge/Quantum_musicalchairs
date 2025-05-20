@@ -273,10 +273,12 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
-	//E field (for debugging only)
 	Efield<<<blocks,TPB>>>(r,E);
 	
+	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+
+	paths_euler<<<blocks,TPB>>>(r,p,E); // 
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
@@ -331,9 +333,9 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[3*idx]=pos[i]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
-				E[3*idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
-				E[3*idx+2]=pos[i+2]/pow(pow(pos[i],2.0)+pow(i+1,2.0)+pow(i+2,2.0),3.0/2.0);
+				E[3*idx]=pos[i]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx+2]=pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
 			}
 		}
 	}
@@ -388,11 +390,14 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			vyn=vynn[threadIdx.x];
 			vzn=vznn[threadIdx.x];
 
+			E[3*idx]=xn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			E[3*idx+1]=yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			E[3*idx+2]=zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+
 			if(znn[idx]>=zdet){
 				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 			}
 		}
 		__syncthreads();
-		// Search online how to call a GPU kernel from another GPU Kernel
 	}
 }
