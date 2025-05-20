@@ -394,7 +394,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			E[3*idx+1]=yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 			E[3*idx+2]=zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 
-			if(zn[idx]>=zdet){
+			if(zn>=zdet){
 				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 			}
 		}
