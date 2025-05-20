@@ -31,7 +31,7 @@ __constant__ double q; // electron charge
 __constant__ double m; // electron rest mass
 __constant__ double hbar; // Planck's constant
 __constant__ double c; // velocity of light in vacuum
-__constant__ double eps0;
+__constant__ double k; // 1/(4*pi*epsilon0)
 __constant__ double v0; // electron velocity in the z direction
 __constant__ double sigma; // electron beam standard deviation
 __constant__ double sigma_p; // electron beam transverse momentum standard deviation
