@@ -339,7 +339,7 @@ __global__ void Efield(double *pos,double *E){
 				E[3*idx+1]=k*pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
 				__syncthreads();
 				E[3*idx+2]=k*pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
-				__syncthreds();
+				__syncthreads();
 			}
 		}
 	}
@@ -408,7 +408,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			}
 			iter++;
 		}
-		printf(iter);
+		printf("Iterator reached value %u before exiting",iter);
 		__syncthreads();
 	}
 }
