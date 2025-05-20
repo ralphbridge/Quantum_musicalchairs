@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define N 3 // Number of electrons
 
-#define steps 300000 // Maximum alloed number of steps to kill simulation
+#define steps 30000 // Maximum alloed number of steps to kill simulation
 
 __device__ double dev_traj[6*steps*N]; // Record single paths (both positions and velocities)
 
@@ -167,6 +167,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double hbar_h=1.0545718e-34;
 	double c_h=299792458.0;
 	double eps0_h=8.85e-12;
+	double k_h=1/(4*pi_h*eps0_h);
 	double v0_h=1.1e7;
 
 	double sigma_p_h=0.05*m_h*v0_h;
@@ -177,14 +178,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
-	double dt_h=zdet_h/(1000*v0_h); // Think about time step
+	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
 	cudaMemcpyToSymbol(m,&m_h,sizeof(double));
 	cudaMemcpyToSymbol(hbar,&hbar_h,sizeof(double));
 	cudaMemcpyToSymbol(c,&c_h,sizeof(double));
-	cudaMemcpyToSymbol(eps0,&eps0_h,sizeof(double));
+	cudaMemcpyToSymbol(k,&k_h,sizeof(double));
 	cudaMemcpyToSymbol(v0,&v0_h,sizeof(double));
 
 	cudaMemcpyToSymbol(sigma_p,&sigma_p_h,sizeof(double));
@@ -333,9 +334,12 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[3*idx]=pos[i]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
-				E[3*idx+1]=pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
-				E[3*idx+2]=pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx]=k*pos[i]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				__syncthreads();
+				E[3*idx+1]=k*pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				__syncthreads();
+				E[3*idx+2]=k*pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				__syncthreds();
 			}
 		}
 	}
@@ -344,6 +348,8 @@ __global__ void Efield(double *pos,double *E){
 //__global__ void paths_euler(double *k,double *angles,double *pos){
 __global__ void paths_euler(double *r,double *p,double *E){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
+
+	unsigned int iter=0;
 	
 	__shared__ double vxnn[TPB];
 	__shared__ double vynn[TPB];
@@ -366,7 +372,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 		}
 
-		while(zn<=zdet){
+		while(zn<=zdet && iter<steps){
 			__syncthreads();
 			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // vxnn represents here the total force in x
 			__syncthreads();
@@ -390,14 +396,19 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			vyn=vynn[threadIdx.x];
 			vzn=vznn[threadIdx.x];
 
-			E[3*idx]=xn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
-			E[3*idx+1]=yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
-			E[3*idx+2]=zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			E[3*idx]=k*xn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			__syncthreads();
+			E[3*idx+1]=k*yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			__syncthreads();
+			E[3*idx+2]=k*zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			__syncthreads();
 
 			if(zn>=zdet){
 				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 			}
+			iter++;
 		}
+		printf(iter);
 		__syncthreads();
 	}
 }
