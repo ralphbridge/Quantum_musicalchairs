@@ -362,11 +362,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		__syncthreads();
 		double vzn=v0+p[3*idx+2]/m;
 
-		if(t==0){
+		if(tn==0){
 			my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 		}
 
-		while(zn<=D){
+		while(zn<=zdet){
 			__syncthreads();
 			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // vxnn represents here the total force in x
 			__syncthreads();
@@ -394,7 +394,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			E[3*idx+1]=yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 			E[3*idx+2]=zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 
-			if(znn[idx]>=zdet){
+			if(zn[idx]>=zdet){
 				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
 			}
 		}
