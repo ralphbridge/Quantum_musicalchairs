@@ -358,10 +358,6 @@ __global__ void paths_euler(double *r,double *p,double *E){
 	__shared__ double vynn[TPB];
 	__shared__ double vznn[TPB];
 
-	E[3*idx]=0;
-	E[3*idx+1]=0;
-	E[3*idx+2]=0;
-
 	if(idx<N){
 		double tn=0.0;
 		double xn=r[3*idx];
@@ -379,13 +375,13 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 		}
 
-		while(zn<=zdet && iter<steps){
+		while(r[3*idx+2]<=zdet && iter<steps){
 			__syncthreads();
-			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // vxnn represents here the total force in x
+			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m;
 			__syncthreads();
-			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m; // vynn represents here the total force in y
+			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m;
 			__syncthreads();
-			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m; // vznn represents here the total force in z
+			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m;
 
 			__syncthreads();
 			tn=tn+dt;
@@ -416,8 +412,8 @@ __global__ void paths_euler(double *r,double *p,double *E){
 				}
 			}
 
-			if(zn>=zdet){
-				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
+			if(r[3*idx+2]>=zdet){
+				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 			}
 			iter++;
 		}
