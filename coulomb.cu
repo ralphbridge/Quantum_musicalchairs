@@ -337,11 +337,11 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[3*idx]=E[3*idx]+k*q*pos[3*i]/pow(pow(pos[3*i],2.0)+pow(pos[3*i+1],2.0)+pow(pos[3*i+2],2.0),3.0/2.0);
+				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
-				E[3*idx+1]=E[3*idx+1]+k*q*pos[3*i+1]/pow(pow(pos[3*i],2.0)+pow(pos[3*i+1],2.0)+pow(pos[3*i+2],2.0),3.0/2.0);
+				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
-				E[3*idx+2]=E[3*idx+2]+k*q*pos[3*i+2]/pow(pow(pos[3*i],2.0)+pow(pos[3*i+1],2.0)+pow(pos[3*i+2],2.0),3.0/2.0);
+				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
 			}
 		}
@@ -400,11 +400,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 			for(int i=0;i<N;i++){
 				if(i!=idx){
-					E[3*idx]=E[3*idx]+k*q*r[3*i]/pow(pow(r[3*i],2.0)+pow(r[3*i+1],2.0)+pow(r[3*i+2],2.0),3.0/2.0);
+					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 					__syncthreads();
-					E[3*idx+1]=E[3*idx+1]+k*q*r[3*i+1]/pow(pow(r[3*i],2.0)+pow(r[3*i+1],2.0)+pow(r[3*i+2],2.0),3.0/2.0);
+					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 					__syncthreads();
-					E[3*idx+2]=E[3*idx+2]+k*q*r[3*i+2]/pow(pow(r[3*i],2.0)+pow(r[3*i+1],2.0)+pow(r[3*i+2],2.0),3.0/2.0);
+					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 					__syncthreads();
 				}
 			}
