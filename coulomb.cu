@@ -331,14 +331,17 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
 
 __global__ void Efield(double *pos,double *E){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+	E[3*idx]=0;
+	E[3*idx+1]=0;
+	E[3*idx+2]=0;
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[3*idx]=k*pos[i]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx]=E[3*idx]+k*q*pos[i]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
 				__syncthreads();
-				E[3*idx+1]=k*pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx+1]=E[3*idx+1]+k*q*pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
 				__syncthreads();
-				E[3*idx+2]=k*pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx+2]=E[3*idx+2]+k*q*pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
 				__syncthreads();
 			}
 		}
@@ -396,11 +399,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			vyn=vynn[threadIdx.x];
 			vzn=vznn[threadIdx.x];
 
-			E[3*idx]=k*xn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			E[3*idx]=k*q*xn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 			__syncthreads();
-			E[3*idx+1]=k*yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			E[3*idx+1]=k*q*yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 			__syncthreads();
-			E[3*idx+2]=k*zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
+			E[3*idx+2]=k*q*zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 			__syncthreads();
 
 			if(zn>=zdet){
