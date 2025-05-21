@@ -279,7 +279,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	//paths_euler<<<blocks,TPB>>>(r,p,E); // 
+	paths_euler<<<blocks,TPB>>>(r,p,E); // 
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
@@ -374,11 +374,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			__syncthreads();
-			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m;
+			vxnn[threadIdx.x]=vxn-dt*q*E[3*idx]/m;
 			__syncthreads();
-			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m;
+			vynn[threadIdx.x]=vyn-dt*q*E[3*idx+1]/m;
 			__syncthreads();
-			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m;
+			vznn[threadIdx.x]=vzn-dt*q*E[3*idx+2]/m;
 
 			__syncthreads();
 			tn=tn+dt;
