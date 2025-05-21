@@ -337,11 +337,11 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[3*idx]=E[3*idx]+k*q*pos[i]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx]=E[3*idx]+k*q*pos[3*i]/pow(pow(pos[3*i],2.0)+pow(pos[3*i+1],2.0)+pow(pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
-				E[3*idx+1]=E[3*idx+1]+k*q*pos[i+1]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx+1]=E[3*idx+1]+k*q*pos[3*i+1]/pow(pow(pos[3*i],2.0)+pow(pos[3*i+1],2.0)+pow(pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
-				E[3*idx+2]=E[3*idx+2]+k*q*pos[i+2]/pow(pow(pos[i],2.0)+pow(pos[i+1],2.0)+pow(pos[i+2],2.0),3.0/2.0);
+				E[3*idx+2]=E[3*idx+2]+k*q*pos[3*i+2]/pow(pow(pos[3*i],2.0)+pow(pos[3*i+1],2.0)+pow(pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
 			}
 		}
@@ -358,6 +358,10 @@ __global__ void paths_euler(double *r,double *p,double *E){
 	__shared__ double vynn[TPB];
 	__shared__ double vznn[TPB];
 
+	E[3*idx]=0;
+	E[3*idx+1]=0;
+	E[3*idx+2]=0;
+
 	if(idx<N){
 		double tn=0.0;
 		double xn=r[3*idx];
@@ -372,7 +376,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		double vzn=v0+p[3*idx+2]/m;
 
 		if(tn==0){
-			my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
+			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 		}
 
 		while(zn<=zdet && iter<steps){
@@ -387,24 +391,30 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			tn=tn+dt;
 
 			__syncthreads();
-			xn=xn+dt*vxn;
+			r[3*idx]=r[3*idx]+dt*vxn;
 
 			__syncthreads();
-			yn=yn+dt*vyn;
+			r[3*idx+1]=r[3*idx+1]+dt*vyn;
 
 			__syncthreads();
-			zn=zn+dt*vzn;
+			r[3*idx+2]=r[3*idx+2]+dt*vzn;
 		
 			vxn=vxnn[threadIdx.x];
 			vyn=vynn[threadIdx.x];
 			vzn=vznn[threadIdx.x];
 
-			E[3*idx]=k*q*xn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
 			__syncthreads();
-			E[3*idx+1]=k*q*yn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
-			__syncthreads();
-			E[3*idx+2]=k*q*zn/pow(pow(xn,2.0)+pow(yn,2.0)+pow(zn,2.0),3.0/2.0);
-			__syncthreads();
+
+			for(int i=0;i<N;i++){
+				if(i!=idx){
+					E[3*idx]=E[3*idx]+k*q*r[3*i]/pow(pow(r[3*i],2.0)+pow(r[3*i+1],2.0)+pow(r[3*i+2],2.0),3.0/2.0);
+					__syncthreads();
+					E[3*idx+1]=E[3*idx+1]+k*q*r[3*i+1]/pow(pow(r[3*i],2.0)+pow(r[3*i+1],2.0)+pow(r[3*i+2],2.0),3.0/2.0);
+					__syncthreads();
+					E[3*idx+2]=E[3*idx+2]+k*q*r[3*i+2]/pow(pow(r[3*i],2.0)+pow(r[3*i+1],2.0)+pow(r[3*i+2],2.0),3.0/2.0);
+					__syncthreads();
+				}
+			}
 
 			if(zn>=zdet){
 				my_push_back(xn,yn,zn,vxn,vyn,vzn,idx);
