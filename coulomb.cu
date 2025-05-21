@@ -374,7 +374,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			__syncthreads();
-			vxnn[threadIdx.x]=vxn-dt*q*E[3*idx]/m;
+			vxnn[threadIdx.x]=vxn-dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			__syncthreads();
 			vynn[threadIdx.x]=vyn-dt*q*E[3*idx+1]/m;
 			__syncthreads();
