@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define N 3 // Number of electrons
 
-#define steps 30000 // Maximum alloed number of steps to kill simulation
+#define steps 300000 // Maximum allowed number of steps to kill simulation
 
 __device__ double dev_traj[6*steps*N]; // Record single paths (both positions and velocities)
 
