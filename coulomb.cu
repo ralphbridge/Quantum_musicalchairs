@@ -394,9 +394,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		__syncthreads();
 		double vzn=p[3*idx+2]/m;
 
-		printf("vx=%f for particle %d",vxn,idx);
-		printf("vy=%f for particle %d",vyn,idx);
-		printf("vz=%f for particle %d",vzn,idx);
+		printf("vx=%f for particle %d\n",vxn,idx);
+		printf("vy=%f for particle %d\n",vyn,idx);
+		printf("vz=%f for particle %d\n",vzn,idx);
 
 		if(tn==0){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
