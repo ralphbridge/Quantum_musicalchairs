@@ -94,6 +94,9 @@ void onHost(){
 	std::cout.precision(15);
 	std::ofstream myfile;
 
+	time_t rawtime;
+	struct tm*timeinfo;
+
 	time(&rawtime);
 	timeinfo=localtime(&rawtime);
 
