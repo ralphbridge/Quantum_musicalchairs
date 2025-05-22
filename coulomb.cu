@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define N 3 // Number of electrons
 
-#define steps 300000 // Maximum allowed number of steps to kill simulation
+#define steps 3000 // Maximum allowed number of steps to kill simulation
 
 __device__ double dev_traj[6*steps*N]; // Record single paths (both positions and velocities)
 
@@ -62,10 +62,10 @@ __device__ void my_push_back(double const &x,double const &y,double const &z,dou
 		dev_traj[6*steps*idx+6*dev_count[idx]+2]=z;
 		dev_traj[6*steps*idx+6*dev_count[idx]+3]=vx;
 		dev_traj[6*steps*idx+6*dev_count[idx]+4]=vy;
-		dev_traj[6*steps*idx+6*dev_count[idx]+5]=vz;	
+		dev_traj[6*steps*idx+6*dev_count[idx]+5]=vz;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
-		printf("Overflow error (in pushback)\n");
+		printf("Overflow error in pushback\n");
 	}
 }
 
@@ -279,7 +279,31 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	paths_euler<<<blocks,TPB>>>(r,p,E); // 
+	paths_euler<<<blocks,TPB>>>(r,p,E);
+
+	int dsizes=6*steps*N;
+
+	std::vector<double> results(dsizes);
+	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
+
+	time_t t=time(0);   // get time now
+	struct tm *now=localtime(&t);
+	char filename_t[80];
+	strftime (filename_t,80,"trajectories%b%d_%H_%M.txt",now);
+
+	std::cout.precision(15);
+	std::ofstream myfile;
+	myfile.open(filename_t);
+
+	if(myfile.is_open()){
+		for(unsigned i=0;i<results.size()-1;i=i+6){
+			if(results[i]+results[i+1]!=0){
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << '\n';
+			}
+		}
+		std::cout << '\n';
+		myfile.close();
+	}
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
@@ -292,6 +316,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaFree(r);
 	cudaFree(p);
 	cudaFree(E);
+	cudaFree(dev_traj);
+	cudaFree(dev_count);
+
+	free(results);
 }
 
 __global__ void setup_rnd(curandState *state,unsigned long seed){
