@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 30 // Number of electrons
+#define N 100 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
@@ -85,33 +85,19 @@ void onHost(){
 
 	cudaEventRecord(start,0);
 
-	FILE *x_vec,*E_vec;
+	time_t t=time(0);   // get time now
+	struct tm *now=localtime(&t);
+	char x_vec[80],E_vec[80];
+	strftime (x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
+	strftime (E_vec,80,"Efield%b%d_%H_%M.txt",now);
 
-	time_t rawtime;
-	struct tm*timeinfo;
+	std::cout.precision(15);
+	std::ofstream myfile;
 
 	time(&rawtime);
 	timeinfo=localtime(&rawtime);
 
 	printf("The current time is %s",asctime(timeinfo));
-	
-	const char* name_x1="initialpositions";
-	const char* name_x2="Efield";
-	const char* format=".txt";
-
-	char day[10];
-
-	strftime(day, sizeof(day)-1, "%d_%H_%M", timeinfo);
-
-	char strtmp[6];
-
-	char filename_x1[512];
-	char filename_x2[512];
-
-	std::copy(asctime(timeinfo)+4,asctime(timeinfo)+7,strtmp);
-
-	sprintf(filename_x1,"%s%s%s%s",name_x1,strtmp,day,format);
-	sprintf(filename_x2,"%s%s%s%s",name_x2,strtmp,day,format);
 
 	// This section computes the random initial position and momentum distributions
 	double *r_h,*theta_h,*phi_h; // Spherical coordinates for each particle's initial positions (N in total)
@@ -132,17 +118,23 @@ void onHost(){
 
 	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h); // GPU function that computes the randomly generated positions
 
-	x_vec=fopen(filename_x1,"w");
-	for(int i=0;i<N;i++){
-		fprintf(x_vec,"%2.8e,%f,%f,%2.8e,%f,%f\n",r_h[i],theta_h[i],phi_h[i],p_h[i],theta_p_h[i],phi_p_h[i]);
+	myfile.open(x_vec);
+	if(myfile.is_open()){
+		for(unsigned i=0;i<N;i++){
+			myfile << std::scientific << r_h[i] << ',' << theta_h[i] << ',' << phi_h[i]  << ',' << p_h[i]  << ',' << theta_p_h[i]  << ',' << phi_p_h[i] << '\n';
+		}
+		std::cout << '\n';
+		myfile.close();
 	}
-	fclose(x_vec);
-	
-	E_vec=fopen(filename_x2,"w");
-	for(int i=0;i<3*N;i=i+3){
-		fprintf(E_vec,"%2.8e,%2.8e,%2.8e\n",E_h[i],E_h[i+1],E_h[i+2]);
+
+	myfile.open(E_vec);
+	if(myfile.is_open()){
+		for(unsigned i=0;i<3*N;i=i+3){
+			myfile << std::scientific << E_h[i] << ',' << E_h[i+1] << ',' << E_h[i+2] << '\n';
+		}
+		std::cout << '\n';
+		myfile.close();
 	}
-	fclose(E_vec);
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -179,7 +171,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
-	double dt_h=zdet_h/(100*v0_h); // Think about time step
+	double dt_h=zdet_h/(1000*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -395,9 +387,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		__syncthreads();
 		double vzn=p[3*idx+2]/m;
 
-		printf("vx=%f for particle %d\n",vxn,idx);
+		/*printf("vx=%f for particle %d\n",vxn,idx);
 		printf("vy=%f for particle %d\n",vyn,idx);
-		printf("vz=%f for particle %d\n",vzn,idx);
+		printf("vz=%f for particle %d\n",vzn,idx);*/
 
 		if(tn==0){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
@@ -443,7 +435,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			if(r[3*idx+2]>=zdet || iter==steps){
 				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 				if(iter==steps){
-					printf("Particle %d did not make it to the detector since iter=%u\n",idx,iter);
+					printf("Particle %d did not make it to the detector\n",idx);
 				}
 			}
 		}
