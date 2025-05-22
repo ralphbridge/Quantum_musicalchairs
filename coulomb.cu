@@ -318,8 +318,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaFree(E);
 	cudaFree(dev_traj);
 	cudaFree(dev_count);
-
-	free(results);
 }
 
 __global__ void setup_rnd(curandState *state,unsigned long seed){
