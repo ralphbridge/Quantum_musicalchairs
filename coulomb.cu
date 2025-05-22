@@ -443,8 +443,8 @@ __global__ void paths_euler(double *r,double *p,double *E){
 				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 			}
 			++iter;
+			printf("Iter=%u for particle %d\n",iter,idx);
 		}
-		printf("Iterator reached value %u before exiting for particle %d\n",iter,idx);
-		__syncthreads();
+		//__syncthreads();
 	}
 }
