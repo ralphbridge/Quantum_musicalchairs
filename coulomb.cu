@@ -178,7 +178,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
-	double dt_h=zdet_h/(100*v0_h); // Think about time step
+	double dt_h=zdet_h/(10*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -392,8 +392,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		__syncthreads();
 		double vyn=p[3*idx+1]/m;
 		__syncthreads();
-		double vzn=v0+p[3*idx+2]/m;
-		printf("%f",vzn);
+		double vzn=p[3*idx+2]/m;
+
+		printf("vx=%f for particle %d",vxn,idx);
+		printf("vy=%f for particle %d",vyn,idx);
+		printf("vz=%f for particle %d",vzn,idx);
 
 		if(tn==0){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
