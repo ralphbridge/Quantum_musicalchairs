@@ -202,6 +202,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double *p_d,*theta_p_d,*phi_p_d;
 	double *r,*p;
 	double *E;
+	double *r_init,*r_new,*theta_new,*phi_new;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -354,10 +355,10 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
 		vec[3*idx+2]=r[idx]*cos(theta[idx]);
 	}
 }
-__global__ void Pauli_blockade(double *pos,double *E){
+__global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
-	r_coh=5.0
+	double r_coh=5.0
 	if(idx<N){
 		for(int i=0;i<idx;i++){
 			r_init[idx]=pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),1/2.0)
