@@ -354,7 +354,27 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
 		vec[3*idx+2]=r[idx]*cos(theta[idx]);
 	}
 }
-
+__global__ void Pauli_blockade(double *pos,double *E){
+	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+	curandState localState=globalState[idx];
+	r_coh=5.0
+	if(idx<N){
+		for(int i=0;i<idx;i++){
+			r_init[idx]=pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),1/2.0)
+			if(r_init < r_coh){
+				r_new[idx]=(r_coh)*curand_uniform(&localState);
+				theta_new[idx]=acos(1.0-2.0*curand_uniform(&localState));
+				phi_new[idx]=2.0 * pi * curand_uniform(&localState); 
+				pos[3*i] = (r_init[idx]+r_new[idx])*sin(theta_new[idx])*cos(phi_new[idx]);
+				__syncthreads();
+				pos[3*i+1] = (r_init[idx]+r_new[idx])*sin(theta_new[idx])*sin(phi_new[idx]);
+				__syncthreads();
+				pos[3*i+2] = (r_init[idx]+r_new[idx])*cos(theta_new[idx]);
+				__syncthreads();
+			}
+		}
+	}
+}
 __global__ void Efield(double *pos,double *E){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	E[3*idx]=0;
@@ -373,6 +393,7 @@ __global__ void Efield(double *pos,double *E){
 		}
 	}
 }
+
 
 //__global__ void paths_euler(double *k,double *angles,double *pos){
 __global__ void paths_euler(double *r,double *p,double *E){
