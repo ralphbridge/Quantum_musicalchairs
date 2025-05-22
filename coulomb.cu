@@ -299,7 +299,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	if(myfile.is_open()){
 		for(unsigned i=0;i<results.size()-1;i=i+7){
 			if(results[i]+results[i+1]!=0){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << results[i+6] << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << std::defaultfloat << static_cast<int>(results[i+6]) << '\n';
 			}
 		}
 		std::cout << '\n';
