@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 10 // Number of electrons
+#define N 30 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
@@ -442,7 +442,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			++iter;
 			if(r[3*idx+2]>=zdet || iter==steps){
 				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
-				printf("Particle %d did not make it to the detector since iter=%u\n",iter,idx);
+				if(iter==steps){
+					printf("Particle %d did not make it to the detector since iter=%u\n",idx,iter);
+				}
 			}
 		}
 		//__syncthreads();
