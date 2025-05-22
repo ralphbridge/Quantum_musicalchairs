@@ -178,7 +178,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
-	double dt_h=zdet_h/(10*v0_h); // Think about time step
+	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -444,7 +444,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			}
 			iter++;
 		}
-		printf("Iterator reached value %u before exiting",iter);
+		printf("Iterator reached value %u before exiting for particle %d\n",iter,idx);
 		__syncthreads();
 	}
 }
