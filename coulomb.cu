@@ -24,7 +24,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define steps 100 // Maximum allowed number of steps to kill simulation
 
-__device__ double dev_traj[6*steps*N]; // Record single paths (both positions and velocities)
+__device__ double dev_traj[7*steps*N]; // Record single paths (both positions and velocities)
 
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -57,12 +57,13 @@ __device__ unsigned int dev_count[N]; // Global index that counts (per thread) i
 
 __device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<steps){
-		dev_traj[6*steps*idx+6*dev_count[idx]]=x;
-		dev_traj[6*steps*idx+6*dev_count[idx]+1]=y;
-		dev_traj[6*steps*idx+6*dev_count[idx]+2]=z;
-		dev_traj[6*steps*idx+6*dev_count[idx]+3]=vx;
-		dev_traj[6*steps*idx+6*dev_count[idx]+4]=vy;
-		dev_traj[6*steps*idx+6*dev_count[idx]+5]=vz;
+		dev_traj[7*steps*idx+7*dev_count[idx]]=x;
+		dev_traj[7*steps*idx+7*dev_count[idx]+1]=y;
+		dev_traj[7*steps*idx+7*dev_count[idx]+2]=z;
+		dev_traj[7*steps*idx+7*dev_count[idx]+3]=vx;
+		dev_traj[7*steps*idx+7*dev_count[idx]+4]=vy;
+		dev_traj[7*steps*idx+7*dev_count[idx]+5]=vz;
+		dev_traj[7*steps*idx+7*dev_count[idx]+6]=idx;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
@@ -296,9 +297,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	myfile.open(filename_t);
 
 	if(myfile.is_open()){
-		for(unsigned i=0;i<results.size()-1;i=i+6){
+		for(unsigned i=0;i<results.size()-1;i=i+7){
 			if(results[i]+results[i+1]!=0){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << results[i+6] << '\n';
 			}
 		}
 		std::cout << '\n';
@@ -438,11 +439,10 @@ __global__ void paths_euler(double *r,double *p,double *E){
 					__syncthreads();
 				}
 			}
-
-			if(r[3*idx+2]>=zdet){
+			++iter;
+			if(r[3*idx+2]>=zdet || iter=steps){
 				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 			}
-			++iter;
 			printf("Iter=%u for particle %d\n",iter,idx);
 		}
 		//__syncthreads();
