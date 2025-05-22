@@ -393,7 +393,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		double vyn=p[3*idx+1]/m;
 		__syncthreads();
 		double vzn=v0+p[3*idx+2]/m;
-		printf("%d",vzn);
+		printf("%f",vzn);
 
 		if(tn==0){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
