@@ -382,6 +382,8 @@ __global__ void Efield(double *pos,double *E){
 		}
 	}
 }
+
+/*
 __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
@@ -403,6 +405,7 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 		}
 	}
 }
+*/
 
 //__global__ void paths_euler(double *k,double *angles,double *pos){
 __global__ void paths_euler(double *r,double *p,double *E){
