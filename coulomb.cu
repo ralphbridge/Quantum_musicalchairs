@@ -37,10 +37,12 @@ __constant__ double sigma; // electron beam standard deviation
 __constant__ double sigma_p; // electron beam transverse momentum standard deviation
 __constant__ double sigma_theta_p;
 
+__constant__ double Vtip; // Tip voltage
+__constant__ double rtip; // Tip radius of curvature
 __constant__ double zdet; // Detector position
 
-__constant__ double rmin;
-__constant__ double rmax;
+__constant__ double rmin; // Minimum spherical shell radius
+__constant__ double rmax; // Maximum spherical shell radius
 
 __constant__ double dt; // time step for the electron trajectory
 
@@ -170,6 +172,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double sigma_p_h=0.05*m_h*v0_h;
 	double sigma_theta_p_h=0.01;
 
+	double Vtip_h=100; // Tip voltage
+	double rtip=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
 	double rmin_h=1e-6;
@@ -188,6 +192,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpyToSymbol(sigma_p,&sigma_p_h,sizeof(double));
 	cudaMemcpyToSymbol(sigma_theta_p,&sigma_theta_p_h,sizeof(double));
 
+	cudaMemcpyToSymbol(Vtip,&Vtip_h,sizeof(double));
+	cudaMemcpyToSymbol(rtip,&rtip_h,sizeof(double));
 	cudaMemcpyToSymbol(zdet,&zdet_h,sizeof(double));
 
 	cudaMemcpyToSymbol(rmin,&rmin_h,sizeof(double));
@@ -354,18 +360,24 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
 
 __global__ void Efield(double *pos,double *E){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+
+	double R1,R2;
+
 	E[3*idx]=0;
 	E[3*idx+1]=0;
 	E[3*idx+2]=0;
 	if(idx<N){
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
+				R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 				__syncthreads();
-				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
+				R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 				__syncthreads();
-				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-1e3;
+				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 				__syncthreads();
+				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				__syncthreads();
+				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 			}
 		}
 	}
@@ -412,6 +424,8 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		__syncthreads();
 		double vzn=p[3*idx+2]/m;
 
+		double R1,R2;
+
 		/*printf("vx=%f for particle %d\n",vxn,idx);
 		printf("vy=%f for particle %d\n",vyn,idx);
 		printf("vz=%f for particle %d\n",vzn,idx);*/
@@ -447,13 +461,16 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			__syncthreads();
 
 			for(int i=0;i<N;i++){
-				if(i!=idx){
-					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+				if(i!=idx && r[3*i+2]<zdet){
+					R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 					__syncthreads();
-					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+					R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 					__syncthreads();
-					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-1e3;
+					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 					__syncthreads();
+					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+					__syncthreads();
+					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 				}
 			}
 			++iter;
