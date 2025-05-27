@@ -161,7 +161,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
-	double q_h=1.6e-19;
+	double q_h=-1.6e-19;
 	double m_h=9.10938356e-31;
 	double hbar_h=1.0545718e-34;
 	double c_h=299792458.0;
@@ -354,7 +354,12 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
 	if(idx<N){
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
-		vec[3*idx+2]=r[idx]*cos(theta[idx]);
+		if(opt=1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
+			__syncthreads();
+			vec[3*idx+2]=rmax+r[idx]*cos(theta[idx]);
+		}else{
+			vec[3*idx+2]=r[idx]*cos(theta[idx]);
+		}
 	}
 }
 
@@ -373,11 +378,11 @@ __global__ void Efield(double *pos,double *E){
 				__syncthreads();
 				R2=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 				__syncthreads();
-				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-Vtip*pos[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)+Vtip*pos[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 				__syncthreads();
-				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-Vtip*pos[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)+Vtip*pos[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 				__syncthreads();
-				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)-Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R2,3.0)-pos[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0)+Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R2,3.0)-pos[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 			}
 		}
 	}
@@ -439,11 +444,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			__syncthreads();
-			vxnn[threadIdx.x]=vxn-dt*q*E[3*idx]/m; // minus sign to account for the e charge
+			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			__syncthreads();
-			vynn[threadIdx.x]=vyn-dt*q*E[3*idx+1]/m;
+			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m;
 			__syncthreads();
-			vznn[threadIdx.x]=vzn-dt*q*E[3*idx+2]/m;
+			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m;
 
 			__syncthreads();
 			tn=tn+dt;
@@ -469,11 +474,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 					__syncthreads();
 					R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 					__syncthreads();
-					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)+Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 					__syncthreads();
-					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)+Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 					__syncthreads();
-					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)-Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0)+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 				}
 			}
 			++iter;
