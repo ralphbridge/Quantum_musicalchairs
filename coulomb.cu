@@ -382,15 +382,15 @@ __global__ void Efield(double *pos,double *E){
 				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 			}
 		}
-		/*R1=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),1.0/2.0);
+		R1=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),1.0/2.0);
 		__syncthreads();
 		R2=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 		__syncthreads();
-		E[3*idx]=E[3*idx]+Vtip*pos[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+		E[3*idx]=E[3*idx]+Vtip*pos[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 		__syncthreads();
-		E[3*idx+1]=E[3*idx+1]+Vtip*pos[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+		E[3*idx+1]=E[3*idx+1]+Vtip*pos[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 		__syncthreads();
-		E[3*idx+2]=E[3*idx+2]+Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R2,3.0)-pos[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
+		E[3*idx+2]=E[3*idx+2]+Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R1,3.0)-pos[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 	}
 }
 
@@ -488,11 +488,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			__syncthreads();
 			R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 			__syncthreads();
-			E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 			__syncthreads();
-			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 			__syncthreads();
-			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 
 			if(iter==20){
 				printf("x=%f for particle %d\n",r[3*idx],idx);
@@ -501,11 +501,11 @@ __global__ void paths_euler(double *r,double *p,double *E){
 				printf("R1=%f for particle %d\n",R1,idx);
 				printf("R2=%f for particle %d\n",R2,idx);
 				__syncthreads();
-				printf("Ex=%f for particle %d\n",Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
+				printf("Ex=%f for particle %d\n",Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
 				__syncthreads();
-				printf("Ey=%f for particle %d\n",Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
+				printf("Ey=%f for particle %d\n",Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
 				__syncthreads();
-				printf("Ez=%f for particle %d\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
+				printf("Ez=%f for particle %d\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
 			}
 
 			++iter;
