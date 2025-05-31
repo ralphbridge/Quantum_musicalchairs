@@ -349,7 +349,7 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 	}
 }
 
-__global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
+__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
