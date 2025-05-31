@@ -487,6 +487,14 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 
+			if(iter==20){
+				printf("R1=%f\n",R1);
+				printf("R2=%f\n",R2);
+				printf("Ex=%f\n",Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
+				printf("Ey=%f\n",Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
+				printf("Ez=%f\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
+			}
+
 			++iter;
 			if(r[3*idx+2]>=zdet || iter==steps){
 				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
