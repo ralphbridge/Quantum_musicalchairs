@@ -51,7 +51,7 @@ void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,doub
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
-__global__ void sph2cart(double *vec,double *r,double *theta,double *phi);
+__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new);
 __global__ void paths_euler(double *r,double *p,double *E);
@@ -273,9 +273,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
-	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
-	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
+	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
 	Efield<<<blocks,TPB>>>(r,E);
 	
@@ -356,7 +356,7 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi){
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt=1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
 			__syncthreads();
-			vec[3*idx+2]=rmax+r[idx]*cos(theta[idx]);
+			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
