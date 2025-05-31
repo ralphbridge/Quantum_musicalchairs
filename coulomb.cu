@@ -482,12 +482,16 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			__syncthreads();
 			R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 			__syncthreads();
-
 			E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			__syncthreads();
 			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			__syncthreads();
 			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 
-			if(iter==20){
+			if(iter==20 && idx==2){
+				printf("x=%f\n",r[3*idx]);
+				printf("y=%f\n",r[3*idx+1]);
+				printf("z=%f\n",r[3*idx+2]);
 				printf("R1=%f\n",R1);
 				printf("R2=%f\n",R2);
 				printf("Ex=%f\n",Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
