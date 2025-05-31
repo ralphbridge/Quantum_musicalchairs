@@ -488,15 +488,18 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			__syncthreads();
 			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 
-			if(iter==20 && idx==2){
-				printf("x=%f\n",r[3*idx]);
-				printf("y=%f\n",r[3*idx+1]);
-				printf("z=%f\n",r[3*idx+2]);
-				printf("R1=%f\n",R1);
-				printf("R2=%f\n",R2);
-				printf("Ex=%f\n",Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
-				printf("Ey=%f\n",Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
-				printf("Ez=%f\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)));
+			if(iter==20){
+				printf("x=%f for particle %d\n",r[3*idx],idx);
+				printf("y=%f for particle %d\n",r[3*idx+1],idx);
+				printf("z=%f for particle %d\n",r[3*idx+2],idx);
+				printf("R1=%f for particle %d\n",R1,idx);
+				printf("R2=%f for particle %d\n",R2,idx);
+				__syncthreads();
+				printf("Ex=%f for particle %d\n",Vtip*r[3*idx]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
+				__syncthreads();
+				printf("Ey=%f for particle %d\n",Vtip*r[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
+				__syncthreads();
+				printf("Ez=%f for particle %d\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R2,3.0)-r[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
 			}
 
 			++iter;
