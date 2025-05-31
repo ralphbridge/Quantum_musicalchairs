@@ -354,7 +354,7 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 	if(idx<N){
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
-		if(opt=1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
+		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
 			__syncthreads();
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
