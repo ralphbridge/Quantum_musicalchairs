@@ -382,7 +382,7 @@ __global__ void Efield(double *pos,double *E){
 				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 			}
 		}
-		R1=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),1.0/2.0);
+		/*R1=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),1.0/2.0);
 		__syncthreads();
 		R2=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
 		__syncthreads();
@@ -390,7 +390,7 @@ __global__ void Efield(double *pos,double *E){
 		__syncthreads();
 		E[3*idx+1]=E[3*idx+1]+Vtip*pos[3*idx+1]*(1.0/pow(R2,3.0)-1.0/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 		__syncthreads();
-		E[3*idx+2]=E[3*idx+2]+Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R2,3.0)-pos[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+		E[3*idx+2]=E[3*idx+2]+Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R2,3.0)-pos[3*idx+2]/pow(R1,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
 	}
 }
 
