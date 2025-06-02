@@ -176,8 +176,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
-	double rmin_h=1e-6;
-	double rmax_h=0.01e-6;
+	double rmin_h=0.0;
+	double rmax_h=1e-6;
 
 	double dt_h=zdet_h/(10*v0_h); // Think about time step
 
