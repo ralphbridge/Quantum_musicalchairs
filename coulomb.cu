@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 100 // Number of electrons
+#define N 3 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
@@ -179,7 +179,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=1e-6;
 	double rmax_h=0.01e-6;
 
-	double dt_h=zdet_h/(1000*v0_h); // Think about time step
+	double dt_h=zdet_h/(10*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
