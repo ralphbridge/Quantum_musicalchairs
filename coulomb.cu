@@ -294,8 +294,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
-	cudaMemcpy(r,pos_h,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(p,mom_h,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	Efield<<<blocks,TPB>>>(r,E);
 	
