@@ -47,7 +47,7 @@ __constant__ double rmax; // Maximum spherical shell radius
 __constant__ double dt; // time step for the electron trajectory
 
 void onHost(); // Main CPU function
-void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E_h); // Main GPU function
+void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E_h,double *pos_h,double *mom_h); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
@@ -128,7 +128,7 @@ void onHost(){
 	
 	E_h=(double*)malloc(3*N*sizeof(double));
 
-	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h); // GPU function that computes the randomly generated positions
+	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
 
 	myfile.open(x_vec);
 	if(myfile.is_open()){
@@ -174,7 +174,7 @@ void onHost(){
 	free(E_h);
 }
 
-void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h){
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h){
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
