@@ -169,7 +169,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double k_h=1/(4*pi_h*eps0_h);
 	double v0_h=1.1e7;
 
-	double sigma_p_h=0.05*m_h*v0_h;
+	//double sigma_p_h=0.05*m_h*v0_h;
+	double sigma_p_h=5.4e-25; // Arjun suggested to use 1eV uniform distribution for p
 	double sigma_theta_p_h=0.01;
 
 	double Vtip_h=100; // Tip voltage
@@ -339,9 +340,11 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 		}else if(opt==3){ // Random azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}else if(opt==4){ // Random momenta magnitude
-			vec[idx]=sigma_p*curand_normal(&localState)+m*v0;
+			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
+			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why p should have any preference between 0 and 1eV
 		}else if(opt==5){ // Random momentum polar angles
-			vec[idx]=sigma_theta_p*curand_normal(&localState);
+			//vec[idx]=sigma_theta_p*curand_normal(&localState);
+			vec[idx]=pi*curand_uniform(&localState); // See comment two lines above
 		}else if(opt==6){ // Random momentum azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}
@@ -372,7 +375,7 @@ __global__ void Efield(double *pos,double *E){
 	E[3*idx+1]=0;
 	E[3*idx+2]=0;
 	if(idx<N){
-		for(int i=0;i<N;i++){
+		/*for(int i=0;i<N;i++){ # Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 483
 			if(i!=idx){
 				__syncthreads();
 				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
@@ -381,7 +384,7 @@ __global__ void Efield(double *pos,double *E){
 				__syncthreads();
 				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 			}
-		}
+		}*/
 		__syncthreads();
 		E[3*idx]=rtip*Vtip*pos[3*idx]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 		__syncthreads();
@@ -480,7 +483,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 			__syncthreads();
 
-			for(int i=0;i<N;i++){
+			/*for(int i=0;i<N;i++){ # Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
 				if(i!=idx && r[3*i+2]<zdet){
 					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 					__syncthreads();
@@ -488,7 +491,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 					__syncthreads();
 					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 				}
-			}
+			}*/
 			__syncthreads();
 			E[3*idx]=rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
 			__syncthreads();
