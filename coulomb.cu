@@ -369,7 +369,7 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 __global__ void Efield(double *pos,double *E){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 
-	double R1,R2;
+	//double R1,R2;
 
 	E[3*idx]=0;
 	E[3*idx+1]=0;
@@ -516,13 +516,13 @@ __global__ void paths_euler(double *r,double *p,double *E){
 				//printf("R2=%f for particle %d\n",R2,idx);
 				__syncthreads();
 				//printf("Ex=%f for particle %d\n",Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
-				printf("Ex=%f for particle %d\n",rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0));
+				printf("Ex=%f for particle %d\n",rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
 				__syncthreads();
 				//printf("Ey=%f for particle %d\n",Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
-				printf("Ey=%f for particle %d\n",rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0));
+				printf("Ey=%f for particle %d\n",rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
 				__syncthreads();
 				//printf("Ez=%f for particle %d\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
-				printf("Ez=%f for particle %d\n",rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0));
+				printf("Ez=%f for particle %d\n",rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
 			}
 
 			++iter;
