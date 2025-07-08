@@ -90,9 +90,10 @@ void onHost(){
 
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
-	char x_vec[80],E_vec[80];
-	strftime (x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
-	strftime (E_vec,80,"Efield%b%d_%H_%M.txt",now);
+	char x_vec[80],x_vec_cart[80],E_vec[80];
+	strftime(x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
+	strftime(x_vec_cart,80,"initialconditionscart%b%d_%H_%M.txt",now);
+	strftime(E_vec,80,"Efield%b%d_%H_%M.txt",now);
 
 	std::cout.precision(15);
 	std::ofstream myfile;
@@ -108,6 +109,7 @@ void onHost(){
 	// This section computes the random initial position and momentum distributions
 	double *r_h,*theta_h,*phi_h; // Spherical coordinates for each particle's initial positions (N in total)
 	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
+	double *pos_h,*mom_h; // Cartesian variables (N in total for position and N in total for momentum)
 	double *E_h; // Electric field (just for debugging)
 	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
@@ -115,10 +117,14 @@ void onHost(){
 	r_h=(double*)malloc(N*sizeof(double));
 	theta_h=(double*)malloc(N*sizeof(double));
 	phi_h=(double*)malloc(N*sizeof(double));
+
+	pos_h=(double*)malloc(3*N*sizeof(double)); // Positions in cartesian coordinates
 	
 	p_h=(double*)malloc(N*sizeof(double));
 	theta_p_h=(double*)malloc(N*sizeof(double));
 	phi_p_h=(double*)malloc(N*sizeof(double));
+
+	mom_h=(double*)malloc(3*N*sizeof(double)); // Momentum in cartesian coordinates
 	
 	E_h=(double*)malloc(3*N*sizeof(double));
 
@@ -128,6 +134,15 @@ void onHost(){
 	if(myfile.is_open()){
 		for(unsigned i=0;i<N;i++){
 			myfile << std::scientific << r_h[i] << ',' << theta_h[i] << ',' << phi_h[i]  << ',' << p_h[i]  << ',' << theta_p_h[i]  << ',' << phi_p_h[i] << '\n';
+		}
+		std::cout << '\n';
+		myfile.close();
+	}
+
+	myfile.open(x_vec_cart);
+	if(myfile.is_open()){
+		for(unsigned i=0;i<3*N;i=i+3){
+			myfile << std::scientific << pos_h[i] << ',' << pos_h[i+1] << ',' << pos_h[i+2] << ',' << mom_h[i] << ',' << mom_h[i+1] << ',' << mom_h[i+2] << '\n';
 		}
 		std::cout << '\n';
 		myfile.close();
@@ -154,6 +169,8 @@ void onHost(){
 	free(p_h);
 	free(theta_p_h);
 	free(phi_p_h);
+	free(pos_h);
+	free(mom_h);
 	free(E_h);
 }
 
@@ -180,7 +197,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=0.0;
 	double rmax_h=1e-6;
 
-	double dt_h=zdet_h/(10*v0_h); // Think about time step
+	double dt_h=zdet_h/(v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -204,7 +221,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	double *r_d,*theta_d,*phi_d;
 	double *p_d,*theta_p_d,*phi_p_d;
-	double *r,*p;
+	double *r,*p; // Device position and momentum variables in cartesian coordinates
 	double *E;
 
 	printf("Coulomb explosion\n");
@@ -228,9 +245,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&theta_p_d,N*sizeof(double));
 	cudaMalloc((void**)&phi_p_d,N*sizeof(double));
 	
-	cudaMalloc((void**)&r,3*N*sizeof(double));
+	cudaMalloc((void**)&r,3*N*sizeof(double)); // Position and momentum in cartesian coordinates
 	cudaMalloc((void**)&p,3*N*sizeof(double));
-	cudaMalloc((void**)&E,3*N*sizeof(double));
 	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
 
@@ -278,6 +294,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
+	cudaMemcpy(r,pos_h,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(p,mom_h,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+
 	Efield<<<blocks,TPB>>>(r,E);
 	
 	//E field GPU to CPU migration(for debugging only)
