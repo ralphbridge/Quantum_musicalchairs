@@ -1,0 +1,16 @@
+The current time is Wed Jul  9 17:20:14 2025
+Coulomb explosion
+Number of particles (N): 3
+r_min=0.000000e+00 m
+r_max=1.000000e-06 m
+sigmap=5.400000e-25 kg*m/s
+sigmathetap=0.010000 rad
+dt=9.090909e-11 s
+Threads per block: 256
+Number of blocks: 1
+
+
+
+
+Total time: 0.0000 hours
+------------------------------------------------------------
