@@ -24,8 +24,8 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
-__device__ double dev_traj[7*2*N]; // Record single paths (both positions and velocities)
-
+__device__ double dev_traj[10*steps*N]; // Record single paths (both positions and velocities)
+ 
 __constant__ double pi;
 __constant__ double q; // electron charge
 __constant__ double m; // electron rest mass
@@ -58,15 +58,18 @@ __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
-__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<steps){
-		dev_traj[7*steps*idx+7*dev_count[idx]]=x;
-		dev_traj[7*steps*idx+7*dev_count[idx]+1]=y;
-		dev_traj[7*steps*idx+7*dev_count[idx]+2]=z;
-		dev_traj[7*steps*idx+7*dev_count[idx]+3]=vx;
-		dev_traj[7*steps*idx+7*dev_count[idx]+4]=vy;
-		dev_traj[7*steps*idx+7*dev_count[idx]+5]=vz;
-		dev_traj[7*steps*idx+7*dev_count[idx]+6]=idx;
+		dev_traj[10*steps*idx+10*dev_count[idx]]=x;
+		dev_traj[10*steps*idx+10*dev_count[idx]+1]=y;
+		dev_traj[10*steps*idx+10*dev_count[idx]+2]=z;
+		dev_traj[10*steps*idx+10*dev_count[idx]+3]=vx;
+		dev_traj[10*steps*idx+10*dev_count[idx]+4]=vy;
+		dev_traj[10*steps*idx+10*dev_count[idx]+5]=vz;
+		dev_traj[10*steps*idx+10*dev_count[idx]+6]=Ex;
+		dev_traj[10*steps*idx+10*dev_count[idx]+7]=Ey;
+		dev_traj[10*steps*idx+10*dev_count[idx]+8]=Ez;
+		dev_traj[10*steps*idx+10*dev_count[idx]+9]=idx;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
@@ -304,7 +307,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
-	int dsizes=6*steps*N;
+	int dsizes=10*steps*N;
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
@@ -319,9 +322,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	myfile.open(filename_t);
 
 	if(myfile.is_open()){
-		for(unsigned i=0;i<results.size()-1;i=i+7){
+		for(unsigned i=0;i<results.size()-1;i=i+10){
 			if(results[i]+results[i+1]!=0){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << std::defaultfloat << static_cast<int>(results[i+6]) << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << std::defaultfloat << static_cast<int>(results[i+9]) << '\n';
 			}
 		}
 		std::cout << '\n';
@@ -472,11 +475,12 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		printf("vy=%f for particle %d\n",vyn,idx);
 		printf("vz=%f for particle %d\n",vzn,idx);*/
 
-		if(tn==0){
+		/*if(tn==0){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
-		}
+		}*/
 
 		while(r[3*idx+2]<=zdet && iter<steps){
+			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
 			__syncthreads();
 			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			__syncthreads();
@@ -527,7 +531,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			__syncthreads();
 			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
 
-			if(iter==20){
+			/*if(iter==20){
 				printf("x=%f for particle %d\n",r[3*idx],idx);
 				printf("y=%f for particle %d\n",r[3*idx+1],idx);
 				printf("z=%f for particle %d\n",r[3*idx+2],idx);
@@ -542,15 +546,15 @@ __global__ void paths_euler(double *r,double *p,double *E){
 				__syncthreads();
 				//printf("Ez=%f for particle %d\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
 				printf("Ez=%f for particle %d\n",rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
-			}
+			}*/
 
 			++iter;
-			if(r[3*idx+2]>=zdet || iter==steps){
+			/*if(r[3*idx+2]>=zdet || iter==steps){
 				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
 				if(iter==steps){
 					printf("Particle %d did not make it to the detector\n",idx);
 				}
-			}
+			}*/
 		}
 		//__syncthreads();
 	}
