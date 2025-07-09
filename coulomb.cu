@@ -200,7 +200,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=0.0;
 	double rmax_h=1e-6;
 
-	double dt_h=zdet_h/(v0_h); // Think about time step
+	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -363,7 +363,7 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}else if(opt==4){ // Random momenta magnitude
 			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
-			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why p should have any preference between 0 and 1eV
+			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
 		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
 			vec[idx]=pi*curand_uniform(&localState); // See comment two lines above
