@@ -462,12 +462,15 @@ __global__ void paths_euler(double *r,double *p,double *E){
 	if(idx<N){
 		double tn=0.0;
 
-		__syncthreads();
+		/*__syncthreads();
 		double vxn=p[3*idx]/m;
 		__syncthreads();
 		double vyn=p[3*idx+1]/m;
 		__syncthreads();
-		double vzn=p[3*idx+2]/m;
+		double vzn=p[3*idx+2]/m;*/
+		vxn=0;
+		vyn=0;
+		vzn=0;
 
 		//double R1,R2;
 
