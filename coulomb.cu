@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 3 // Number of electrons
+#define N 2 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
@@ -304,6 +304,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	// next two lines for testing Coulomb repulsion between particles starting from known positions
+	std::vector<double>rvtest={0,1,rtip+rmax,0,-1,rtip+rmax};
+	std::copy(rvtest.begin(),rvtest.end(),r);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
@@ -397,7 +400,7 @@ __global__ void Efield(double *pos,double *E){
 	E[3*idx+1]=0;
 	E[3*idx+2]=0;
 	if(idx<N){
-		/*for(int i=0;i<N;i++){ # Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 483
+		for(int i=0;i<N;i++){ # Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 483
 			if(i!=idx){
 				__syncthreads();
 				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
@@ -406,13 +409,16 @@ __global__ void Efield(double *pos,double *E){
 				__syncthreads();
 				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 			}
-		}*/
+		}
+		// Radial Electric field from the tip
 		__syncthreads();
 		E[3*idx]=rtip*Vtip*pos[3*idx]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 		__syncthreads();
 		E[3*idx+1]=rtip*Vtip*pos[3*idx+1]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 		__syncthreads();
 		E[3*idx+2]=rtip*Vtip*pos[3*idx+2]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
+
+		// Electric field from the tip using method of images
 		/*R1=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),1.0/2.0);
 		__syncthreads();
 		R2=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
@@ -484,12 +490,17 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
+
 			__syncthreads();
 			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			__syncthreads();
 			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m;
 			__syncthreads();
 			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m;
+
+			vxn=vxnn[threadIdx.x]; // Check if this variables are needed at all
+			vyn=vynn[threadIdx.x];
+			vzn=vznn[threadIdx.x];
 
 			__syncthreads();
 			tn=tn+dt;
@@ -502,14 +513,10 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 			__syncthreads();
 			r[3*idx+2]=r[3*idx+2]+dt*vzn;
-		
-			vxn=vxnn[threadIdx.x];
-			vyn=vynn[threadIdx.x];
-			vzn=vznn[threadIdx.x];
 
 			__syncthreads();
 
-			/*for(int i=0;i<N;i++){ # Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
+			for(int i=0;i<N;i++){ # Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
 				if(i!=idx && r[3*i+2]<zdet){
 					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 					__syncthreads();
@@ -517,13 +524,16 @@ __global__ void paths_euler(double *r,double *p,double *E){
 					__syncthreads();
 					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 				}
-			}*/
+			}
+			// Radial Electric field from the tip
 			__syncthreads();
 			E[3*idx]=rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
 			__syncthreads();
 			E[3*idx+1]=rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
 			__syncthreads();
 			E[3*idx+2]=rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+
+			// Electric field from the tip using method of images
 			/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 			__syncthreads();
 			R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
@@ -533,23 +543,6 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
 			__syncthreads();
 			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
-
-			/*if(iter==20){
-				printf("x=%f for particle %d\n",r[3*idx],idx);
-				printf("y=%f for particle %d\n",r[3*idx+1],idx);
-				printf("z=%f for particle %d\n",r[3*idx+2],idx);
-				//printf("R1=%f for particle %d\n",R1,idx);
-				//printf("R2=%f for particle %d\n",R2,idx);
-				__syncthreads();
-				//printf("Ex=%f for particle %d\n",Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
-				printf("Ex=%f for particle %d\n",rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
-				__syncthreads();
-				//printf("Ey=%f for particle %d\n",Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
-				printf("Ey=%f for particle %d\n",rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
-				__syncthreads();
-				//printf("Ez=%f for particle %d\n",Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet)),idx);
-				printf("Ez=%f for particle %d\n",rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0),idx);
-			}*/
 
 			++iter;
 			/*if(r[3*idx+2]>=zdet || iter==steps){
