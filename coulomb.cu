@@ -304,9 +304,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	// next two lines for testing Coulomb repulsion between particles starting from known positions
-	std::vector<double>rvtest={0,1,rtip_h+rmax_h,0,-1,rtip_h+rmax_h};
-	std::copy(rvtest.begin(),rvtest.end(),r);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
@@ -380,14 +377,22 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
-		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+		/*vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
 			__syncthreads();
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
+		}*/
+		if(idx==0){
+			vec[3*idx+1]=1;
+		}else{
+			vec[3*idx+1]=-1;
 		}
+		vec[3*idx]=0;
+		__syncthreads();
+		vec[3*idx+2]=rtip+rmax;
 	}
 }
 
