@@ -305,7 +305,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 	// next two lines for testing Coulomb repulsion between particles starting from known positions
-	std::vector<double>rvtest={0,1,rtip+rmax,0,-1,rtip+rmax};
+	std::vector<double>rvtest={0,1,rtip_h+rmax_h,0,-1,rtip_h+rmax_h};
 	std::copy(rvtest.begin(),rvtest.end(),r);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
@@ -474,9 +474,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		double vyn=p[3*idx+1]/m;
 		__syncthreads();
 		double vzn=p[3*idx+2]/m;*/
-		vxn=0;
-		vyn=0;
-		vzn=0;
+		double vxn=0;
+		double vyn=0;
+		double vzn=0;
 
 		//double R1,R2;
 
