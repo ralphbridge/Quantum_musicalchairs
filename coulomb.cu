@@ -193,8 +193,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double sigma_p_h=5.4e-25; // Arjun suggested to use 1eV uniform distribution for p
 	double sigma_theta_p_h=0.01;
 
-	//double Vtip_h=-100; // Tip voltage
-	double Vtip_h=0;
+	double Vtip_h=-100; // Tip voltage
+	//double Vtip_h=0;
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
