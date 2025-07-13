@@ -24,7 +24,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
-__device__ double dev_traj[7*steps*N]; // Record single paths (both positions and velocities)
+__device__ double dev_traj[10*steps*N]; // Record single paths (both positions and velocities)
 
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -58,15 +58,18 @@ __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
-__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<steps){
-		dev_traj[7*steps*idx+7*dev_count[idx]]=x;
-		dev_traj[7*steps*idx+7*dev_count[idx]+1]=y;
-		dev_traj[7*steps*idx+7*dev_count[idx]+2]=z;
-		dev_traj[7*steps*idx+7*dev_count[idx]+3]=vx;
-		dev_traj[7*steps*idx+7*dev_count[idx]+4]=vy;
-		dev_traj[7*steps*idx+7*dev_count[idx]+5]=vz;
-		dev_traj[7*steps*idx+7*dev_count[idx]+7]=idx;
+		dev_traj[10*steps*idx+7*dev_count[idx]]=x;
+		dev_traj[10*steps*idx+7*dev_count[idx]+1]=y;
+		dev_traj[10*steps*idx+7*dev_count[idx]+2]=z;
+		dev_traj[10*steps*idx+7*dev_count[idx]+3]=vx;
+		dev_traj[10*steps*idx+7*dev_count[idx]+4]=vy;
+		dev_traj[10*steps*idx+7*dev_count[idx]+5]=vz;
+		dev_traj[10*steps*idx+7*dev_count[idx]]=Ex;
+		dev_traj[10*steps*idx+7*dev_count[idx]+1]=Ey;
+		dev_traj[10*steps*idx+7*dev_count[idx]+2]=Ez;
+		dev_traj[10*steps*idx+7*dev_count[idx]+9]=idx;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
@@ -322,7 +325,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	if(myfile.is_open()){
 		for(unsigned i=0;i<results.size()-1;i=i+10){
 			if(results[i]+results[i+1]!=0){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << std::defaultfloat << static_cast<int>(results[i+6]) << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' results[i+6] << ',' results[i+7] << ',' results[i+8] << ',' << std::defaultfloat << static_cast<int>(results[i+9]) << '\n';
 			}
 		}
 		std::cout << '\n';
@@ -496,7 +499,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		}*/
 
 		while(r[3*idx+2]<=zdet && iter<steps){
-			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
+			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
 
 			__syncthreads();
 			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
