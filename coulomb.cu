@@ -186,16 +186,16 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double hbar_h=1.0545718e-34;
 	double c_h=299792458.0;
 	double eps0_h=8.85e-12;
-	double k_h=1/(4*pi_h*eps0_h);
-	//double k_h=0; // Uncomment to turn off Coulomb interaction
+	//double k_h=1/(4*pi_h*eps0_h);
+	double k_h=0; // Uncomment to turn off Coulomb interaction
 	double v0_h=1.1e7;
 
 	//double sigma_p_h=0.05*m_h*v0_h;
 	double sigma_p_h=5.4e-25; // Arjun suggested to use 1eV uniform distribution for p
 	double sigma_theta_p_h=0.01;
 
-	//double Vtip_h=-100; // Tip voltage
-	double Vtip_h=0; // Uncomment to turn off external electric field
+	double Vtip_h=-100; // Tip voltage
+	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
