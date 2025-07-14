@@ -379,22 +379,22 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
-		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+		/*vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
 			__syncthreads();
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
-		}
-		/*if(idx==0){
+		}*/
+		if(idx==0){
 			vec[3*idx+1]=rmax;
 		}else{
 			vec[3*idx+1]=-rmax;
 		}
 		vec[3*idx]=0;
 		__syncthreads();
-		vec[3*idx+2]=rtip+rmax;*/
+		vec[3*idx+2]=rtip+rmax;
 	}
 }
 
