@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 2 // Number of electrons
+#define N 20 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
@@ -307,7 +307,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	paths_euler<<<blocks,TPB>>>(r,p,E);
+	/*paths_euler<<<blocks,TPB>>>(r,p,E);
 
 	int dsizes=10*steps*N;
 
@@ -331,7 +331,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		}
 		std::cout << '\n';
 		myfile.close();
-	}
+	}*/
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
