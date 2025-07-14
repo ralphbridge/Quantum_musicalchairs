@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 20 // Number of electrons
+#define N 2 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
