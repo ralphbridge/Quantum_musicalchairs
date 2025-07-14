@@ -370,7 +370,7 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
 		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
-			vec[idx]=pi*curand_uniform(&localState); // See comment two lines above
+			vec[idx]=2*pi*curand_uniform(&localState)-pi; // See comment two lines above
 		}else if(opt==6){ // Random momentum azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}
@@ -483,7 +483,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		//double R1,R2;
 
 		while(r[3*idx+2]<=zdet && iter<steps){
-			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
+			if(iter==0){
+				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
+			}
 
 			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			vyn=vyn+dt*q*E[3*idx+1]/m;
@@ -521,5 +523,6 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			++iter;
 			__syncthreads();
 		}
+		my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
 	}
 }
