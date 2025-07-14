@@ -59,17 +59,17 @@ __global__ void paths_euler(double *r,double *p,double *E);
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
 __device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
-	if(dev_count[idx]<steps){
-		dev_traj[10*steps*idx+10*dev_count[idx]]=x;
-		dev_traj[10*steps*idx+10*dev_count[idx]+1]=y;
-		dev_traj[10*steps*idx+10*dev_count[idx]+2]=z;
-		dev_traj[10*steps*idx+10*dev_count[idx]+3]=vx;
-		dev_traj[10*steps*idx+10*dev_count[idx]+4]=vy;
-		dev_traj[10*steps*idx+10*dev_count[idx]+5]=vz;
-		dev_traj[10*steps*idx+10*dev_count[idx]+6]=Ex;
-		dev_traj[10*steps*idx+10*dev_count[idx]+7]=Ey;
-		dev_traj[10*steps*idx+10*dev_count[idx]+8]=Ez;
-		dev_traj[10*steps*idx+10*dev_count[idx]+9]=idx;
+	if(dev_count[idx]<2){
+		dev_traj[10*2*idx+10*dev_count[idx]]=x;
+		dev_traj[10*2*idx+10*dev_count[idx]+1]=y;
+		dev_traj[10*2*idx+10*dev_count[idx]+2]=z;
+		dev_traj[10*2*idx+10*dev_count[idx]+3]=vx;
+		dev_traj[10*2*idx+10*dev_count[idx]+4]=vy;
+		dev_traj[10*2*idx+10*dev_count[idx]+5]=vz;
+		dev_traj[10*2*idx+10*dev_count[idx]+6]=Ex;
+		dev_traj[10*2*idx+10*dev_count[idx]+7]=Ey;
+		dev_traj[10*2*idx+10*dev_count[idx]+8]=Ez;
+		dev_traj[10*2*idx+10*dev_count[idx]+9]=idx;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
