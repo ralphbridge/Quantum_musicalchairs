@@ -193,8 +193,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double sigma_p_h=5.4e-25; // Arjun suggested to use 1eV uniform distribution for p
 	double sigma_theta_p_h=0.01;
 
-	double Vtip_h=-100; // Tip voltage
-	//double Vtip_h=0;
+	//double Vtip_h=-100; // Tip voltage
+	double Vtip_h=0;
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
@@ -378,22 +378,22 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if(idx<N){
-		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
+		/*vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
 			__syncthreads();
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
-		}
-		/*if(idx==0){
+		}*/
+		if(idx==0){
 			vec[3*idx+1]=rmax;
 		}else{
 			vec[3*idx+1]=-rmax;
 		}
 		vec[3*idx]=0;
 		__syncthreads();
-		vec[3*idx+2]=rtip+rmax;*/
+		vec[3*idx+2]=rtip+rmax;
 	}
 }
 
