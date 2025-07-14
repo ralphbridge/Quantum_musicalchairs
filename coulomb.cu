@@ -311,7 +311,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
-	int dsizes=10*steps*N;
+	int dsizes=10*2*N;
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
