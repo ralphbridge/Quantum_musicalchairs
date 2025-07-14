@@ -197,13 +197,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
-	double zdet_h=10e-2; // Detector position
+	//double zdet_h=10e-2; // Detector position
+	double zdet_h=1e-6;
 
 	double rmin_h=0.0;
 	double rmax_h=1e-6;
 	//double rmax_h=rtip_h/10;
 
-	double dt_h=zdet_h/(1000*v0_h); // Think about time step
+	double dt_h=zdet_h/(10000*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
