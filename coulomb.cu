@@ -307,7 +307,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	/*paths_euler<<<blocks,TPB>>>(r,p,E);
+	paths_euler<<<blocks,TPB>>>(r,p,E);
 
 	int dsizes=10*steps*N;
 
@@ -331,7 +331,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		}
 		std::cout << '\n';
 		myfile.close();
-	}*/
+	}
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
