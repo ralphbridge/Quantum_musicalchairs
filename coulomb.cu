@@ -186,8 +186,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double hbar_h=1.0545718e-34;
 	double c_h=299792458.0;
 	double eps0_h=8.85e-12;
-	double k_h=1/(4*pi_h*eps0_h);
-	//double k_h=0; // Uncomment to turn off Coulomb interaction
+	//double k_h=1/(4*pi_h*eps0_h);
+	double k_h=0; // Uncomment to turn off Coulomb interaction
 	double v0_h=1.1e7;
 
 	//double sigma_p_h=0.05*m_h*v0_h;
