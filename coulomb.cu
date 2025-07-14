@@ -467,19 +467,12 @@ __global__ void paths_euler(double *r,double *p,double *E){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
 	unsigned int iter=0;
-	
-	__shared__ double vxnn[TPB];
-	__shared__ double vynn[TPB];
-	__shared__ double vznn[TPB];
 
 	if(idx<N){
 		double tn=0.0;
 
-		/*__syncthreads();
-		double vxn=p[3*idx]/m;
-		__syncthreads();
+		/*double vxn=p[3*idx]/m;
 		double vyn=p[3*idx+1]/m;
-		__syncthreads();
 		double vzn=p[3*idx+2]/m;*/
 		double vxn=0;
 		double vyn=0;
@@ -487,57 +480,29 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		//double R1,R2;
 
-		/*printf("vx=%f for particle %d\n",vxn,idx);
-		printf("vy=%f for particle %d\n",vyn,idx);
-		printf("vz=%f for particle %d\n",vzn,idx);*/
-
-		/*if(tn==0){
-			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
-		}*/
-
 		while(r[3*idx+2]<=zdet && iter<steps){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
 
-			__syncthreads();
-			vxnn[threadIdx.x]=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
-			__syncthreads();
-			vynn[threadIdx.x]=vyn+dt*q*E[3*idx+1]/m;
-			__syncthreads();
-			vznn[threadIdx.x]=vzn+dt*q*E[3*idx+2]/m;
+			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
+			vyn=vyn+dt*q*E[3*idx+1]/m;
+			vzn=vzn+dt*q*E[3*idx+2]/m;
 
-			vxn=vxnn[threadIdx.x]; // Check if this variables are needed at all
-			vyn=vynn[threadIdx.x];
-			vzn=vznn[threadIdx.x];
-
-			__syncthreads();
 			tn=tn+dt;
 
-			__syncthreads();
 			r[3*idx]=r[3*idx]+dt*vxn;
-
-			__syncthreads();
 			r[3*idx+1]=r[3*idx+1]+dt*vyn;
-
-			__syncthreads();
 			r[3*idx+2]=r[3*idx+2]+dt*vzn;
-
-			__syncthreads();
 
 			for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
 				if(i!=idx && r[3*i+2]<zdet){
 					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					__syncthreads();
 					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					__syncthreads();
 					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 				}
 			}
 			// Radial Electric field from the tip
-			__syncthreads();
 			E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-			__syncthreads();
 			E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-			__syncthreads();
 			E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
 
 			// Electric field from the tip using method of images
@@ -552,13 +517,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
 
 			++iter;
-			/*if(r[3*idx+2]>=zdet || iter==steps){
-				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,idx);
-				if(iter==steps){
-					printf("Particle %d did not make it to the detector\n",idx);
-				}
-			}*/
+			__syncthreads();
 		}
-		//__syncthreads();
 	}
 }
