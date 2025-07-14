@@ -194,8 +194,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double sigma_p_h=5.4e-25; // Arjun suggested to use 1eV uniform distribution for p
 	double sigma_theta_p_h=0.01;
 
-	double Vtip_h=-100; // Tip voltage
-	//double Vtip_h=0; // Uncomment to turn off external electric field
+	//double Vtip_h=-100; // Tip voltage
+	double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
@@ -389,9 +389,9 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}*/
 		if(idx==0){
-			vec[3*idx+1]=0.1*rmax;
+			vec[3*idx+1]=0.01*rmax;
 		}else{
-			vec[3*idx+1]=-0.1*rmax;
+			vec[3*idx+1]=-0.01*rmax;
 		}
 		vec[3*idx]=0;
 		__syncthreads();
