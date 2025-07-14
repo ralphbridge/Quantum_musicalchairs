@@ -194,14 +194,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double sigma_p_h=5.4e-25; // Arjun suggested to use 1eV uniform distribution for p
 	double sigma_theta_p_h=0.01;
 
-	//double Vtip_h=-100; // Tip voltage
-	double Vtip_h=0; // Uncomment to turn off external electric field
+	double Vtip_h=-100; // Tip voltage
+	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=10e-2; // Detector position
 
 	double rmin_h=0.0;
-	//double rmax_h=1e-6;
-	double rmax_h=rtip_h/10;
+	double rmax_h=1e-6;
+	//double rmax_h=rtip_h/10;
 
 	double dt_h=zdet_h/(1000*v0_h); // Think about time step
 
