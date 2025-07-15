@@ -479,9 +479,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		//double R1,R2;
 
 		while(r[3*idx+2]<=zdet && iter<steps){
-			if(iter==0){
-				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
-			}
+			//if(iter==0){
+			my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
+			//}
 
 			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			vyn=vyn+dt*q*E[3*idx+1]/m;
