@@ -20,11 +20,11 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 100000 // Number of electrons
+#define N 1000 // Number of electrons
 
-#define steps 10000 // Maximum allowed number of steps to kill simulation
+#define steps 100000 // Maximum allowed number of steps to kill simulation
 
-__device__ double dev_traj[10*2*N]; // Record single paths (both positions and velocities)
+__device__ double dev_traj[11*2*N]; // Record single paths (both positions and velocities)
  
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -58,18 +58,19 @@ __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
-__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+__device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<2){
-		dev_traj[10*2*idx+10*dev_count[idx]]=x;
-		dev_traj[10*2*idx+10*dev_count[idx]+1]=y;
-		dev_traj[10*2*idx+10*dev_count[idx]+2]=z;
-		dev_traj[10*2*idx+10*dev_count[idx]+3]=vx;
-		dev_traj[10*2*idx+10*dev_count[idx]+4]=vy;
-		dev_traj[10*2*idx+10*dev_count[idx]+5]=vz;
-		dev_traj[10*2*idx+10*dev_count[idx]+6]=Ex;
-		dev_traj[10*2*idx+10*dev_count[idx]+7]=Ey;
-		dev_traj[10*2*idx+10*dev_count[idx]+8]=Ez;
-		dev_traj[10*2*idx+10*dev_count[idx]+9]=idx;
+		dev_traj[11*2*idx+11*dev_count[idx]]=x;
+		dev_traj[11*2*idx+11*dev_count[idx]+1]=y;
+		dev_traj[11*2*idx+11*dev_count[idx]+2]=z;
+		dev_traj[11*2*idx+11*dev_count[idx]+3]=vx;
+		dev_traj[11*2*idx+11*dev_count[idx]+4]=vy;
+		dev_traj[11*2*idx+11*dev_count[idx]+5]=vz;
+		dev_traj[11*2*idx+11*dev_count[idx]+6]=Ex;
+		dev_traj[11*2*idx+11*dev_count[idx]+7]=Ey;
+		dev_traj[11*2*idx+11*dev_count[idx]+8]=Ez;
+		dev_traj[11*2*idx+11*dev_count[idx]+9]=idx;
+		dev_traj[11*2*idx+11*dev_count[idx]+10]=i;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
@@ -93,10 +94,10 @@ void onHost(){
 
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
-	char x_vec[80],x_vec_cart[80],E_vec[80];
-	strftime(x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
-	strftime(x_vec_cart,80,"initialconditionscart%b%d_%H_%M.txt",now);
-	strftime(E_vec,80,"Efield%b%d_%H_%M.txt",now);
+	//char x_vec[80],x_vec_cart[80],E_vec[80];
+	//strftime(x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
+	//strftime(x_vec_cart,80,"initialconditionscart%b%d_%H_%M.txt",now);
+	//strftime(E_vec,80,"Efield%b%d_%H_%M.txt",now);
 
 	std::cout.precision(15);
 	std::ofstream myfile;
@@ -133,7 +134,7 @@ void onHost(){
 
 	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
 
-	myfile.open(x_vec);
+	/*myfile.open(x_vec);
 	if(myfile.is_open()){
 		for(unsigned i=0;i<N;i++){
 			myfile << std::scientific << r_h[i] << ',' << theta_h[i] << ',' << phi_h[i]  << ',' << p_h[i]  << ',' << theta_p_h[i]  << ',' << phi_p_h[i] << '\n';
@@ -158,7 +159,7 @@ void onHost(){
 		}
 		std::cout << '\n';
 		myfile.close();
-	}
+	}*/
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -204,7 +205,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmax_h=1e-6;
 	//double rmax_h=rtip_h/10;
 
-	double dt_h=zdet_h/(10000*v0_h); // Think about time step
+	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -273,9 +274,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//phi
 	rndvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
 
-	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
 	curandState *devStates_p;
 	cudaMalloc(&devStates_p,N*sizeof(curandState));
@@ -293,25 +294,25 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//phi_p
 	rndvecs<<<blocks,TPB>>>(phi_p_d,devStates_p,6,N);
 
-	cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
 	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
 	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 	
-	cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	Efield<<<blocks,TPB>>>(r,E);
 	
 	//E field GPU to CPU migration(for debugging only)
-	cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
-	int dsizes=10*2*N;
+	int dsizes=11*2*N;
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
@@ -326,9 +327,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	myfile.open(filename_t);
 
 	if(myfile.is_open()){
-		for(unsigned i=0;i<results.size()-1;i=i+10){
+		for(unsigned i=0;i<results.size()-1;i=i+11){
 			if(results[i]+results[i+1]!=0){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << std::defaultfloat << static_cast<int>(results[i+9]) << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << std::defaultfloat << static_cast<int>(results[i+9]) << ',' << static_cast<int>(results[i+10]) << '\n';
 			}
 		}
 		std::cout << '\n';
@@ -411,20 +412,14 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 483
 			if(i!=idx){
-				__syncthreads();
 				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
-				__syncthreads();
 				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
-				__syncthreads();
 				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 			}
 		}
 		// Radial Electric field from the tip
-		__syncthreads();
 		E[3*idx]=E[3*idx]+rtip*Vtip*pos[3*idx]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
-		__syncthreads();
 		E[3*idx+1]=E[3*idx+1]+rtip*Vtip*pos[3*idx+1]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
-		__syncthreads();
 		E[3*idx+2]=E[3*idx+2]+rtip*Vtip*pos[3*idx+2]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 
 		// Electric field from the tip using method of images
@@ -473,23 +468,27 @@ __global__ void paths_euler(double *r,double *p,double *E){
 	if(idx<N){
 		double tn=0.0;
 
-		/*double vxn=p[3*idx]/m;
+		double vxn=p[3*idx]/m;
 		double vyn=p[3*idx+1]/m;
-		double vzn=p[3*idx+2]/m;*/
-		double vxn=0;
+		double vzn=p[3*idx+2]/m;
+		/*double vxn=0;
 		double vyn=0;
-		double vzn=0;
+		double vzn=0;*/
 
 		//double R1,R2;
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			if(iter==0){
-				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
+				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
 			}
 
 			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			vyn=vyn+dt*q*E[3*idx+1]/m;
 			vzn=vzn+dt*q*E[3*idx+2]/m;
+
+			E[3*idx]=0; // Initializing E filed at the particle position for each iteration
+			E[3*idx+1]=0;
+			E[3*idx+2]=0;
 
 			tn=tn+dt;
 
@@ -523,6 +522,6 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			++iter;
 			__syncthreads();
 		}
-		my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
+		my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
 	}
 }
