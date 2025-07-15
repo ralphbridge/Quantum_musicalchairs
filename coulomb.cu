@@ -330,12 +330,12 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	if(myfile.is_open()){
 		for(unsigned i=0;i<results.size()-1;i=i+12){
 			if(results[i]+results[i+1]!=0){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << std::defaultfloat << static_cast<int>(results[i+9]) << ',' << static_cast<int>(results[i+10]) << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << std::defaultfloat << static_cast<int>(results[i+10]) << ',' << static_cast<int>(results[i+11]) << '\n';
 			}
 		}
 		std::cout << '\n';
 		myfile.close();
-	}
+	} // added 12th variable
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
