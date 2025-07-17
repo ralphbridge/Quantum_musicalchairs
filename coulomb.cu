@@ -373,7 +373,7 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=0;
 		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
-			//vec[idx]=2*pi*curand_uniform(&localState)-pi; // See comment two lines above
+			//vec[idx]=pi*curand_uniform(&localState)-pi/2.0; // See comment two lines above
 			vec[idx]=0;
 		}else if(opt==6){ // Random momentum azimuthal angles
 			//vec[idx]=2.0*pi*curand_uniform(&localState);
