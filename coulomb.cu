@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 1000 // Number of electrons
+#define N 100 // Number of electrons
 
 #define steps 50000 // Maximum allowed number of steps to kill simulation
 
@@ -369,12 +369,15 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}else if(opt==4){ // Random momenta magnitude
 			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
-			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
+			//vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
+			vec[idx]=0;
 		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
-			vec[idx]=2*pi*curand_uniform(&localState)-pi; // See comment two lines above
+			//vec[idx]=2*pi*curand_uniform(&localState)-pi; // See comment two lines above
+			vec[idx]=0;
 		}else if(opt==6){ // Random momentum azimuthal angles
-			vec[idx]=2.0*pi*curand_uniform(&localState);
+			//vec[idx]=2.0*pi*curand_uniform(&localState);
+			vec[idx]=0;
 		}
 		globalState[idx]=localState; // Update current seed state
 	}
@@ -386,7 +389,6 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
-			__syncthreads();
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
