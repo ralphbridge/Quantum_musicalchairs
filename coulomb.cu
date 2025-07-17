@@ -20,11 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-<<<<<<< HEAD
-#define N 1000 // Number of electrons
-=======
 #define N 100 // Number of electrons
->>>>>>> 5a93b4674906ac9a11c4df8897b26f311032a3d3
 
 #define steps 50000 // Maximum allowed number of steps to kill simulation
 
@@ -333,11 +329,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	if(myfile.is_open()){
 		for(unsigned i=0;i<results.size()-1;i=i+12){
-<<<<<<< HEAD
-			if(results[i]+results[i+1]!=0){
-=======
 			if(results[i]+results[i+1]!=0){ // Check this condition, I do not understand why I put it there
->>>>>>> 5a93b4674906ac9a11c4df8897b26f311032a3d3
 				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << std::defaultfloat << static_cast<int>(results[i+10]) << ',' << static_cast<int>(results[i+11]) << '\n';
 			}
 		}
@@ -377,14 +369,6 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}else if(opt==4){ // Random momenta magnitude
 			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
-<<<<<<< HEAD
-			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
-		}else if(opt==5){ // Random momentum polar angles
-			//vec[idx]=sigma_theta_p*curand_normal(&localState);
-			vec[idx]=2*pi*curand_uniform(&localState)-pi; // See comment two lines above
-		}else if(opt==6){ // Random momentum azimuthal angles
-			vec[idx]=2.0*pi*curand_uniform(&localState);
-=======
 			//vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
 			vec[idx]=0;
 		}else if(opt==5){ // Random momentum polar angles
@@ -394,7 +378,6 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 		}else if(opt==6){ // Random momentum azimuthal angles
 			//vec[idx]=2.0*pi*curand_uniform(&localState);
 			vec[idx]=0;
->>>>>>> 5a93b4674906ac9a11c4df8897b26f311032a3d3
 		}
 		globalState[idx]=localState; // Update current seed state
 	}
@@ -406,10 +389,6 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
-<<<<<<< HEAD
-			__syncthreads();
-=======
->>>>>>> 5a93b4674906ac9a11c4df8897b26f311032a3d3
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
