@@ -170,7 +170,6 @@ void onHost(){
 	cudaEventElapsedTime(&elapsedTime,start,stop);
 	printf("Total time: %6.4f minutes\n",elapsedTime*1e-3/60.0);
 	printf("------------------------------------------------------------\n");
-	printf("%f",Energy_h);
 
 	free(r_h);
 	free(theta_h);
@@ -513,7 +512,7 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 			}
 			Energy[idx]=Energy[idx]+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 		}
-
+		printf("Energy %f J for particle %d \n",Energy[idx],idx);
 		while(r[3*idx+2]<=zdet && iter<steps){
 			//if(iter==0){
 			my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
@@ -568,5 +567,6 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 			}
 			Energy[idx+1]=Energy[idx+1]+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 		}
+		printf("Energy %f J for particle %d \n",Energy[idx],idx);
 	}
 }
