@@ -170,6 +170,7 @@ void onHost(){
 	cudaEventElapsedTime(&elapsedTime,start,stop);
 	printf("Total time: %6.4f minutes\n",elapsedTime*1e-3/60.0);
 	printf("------------------------------------------------------------\n");
+	printf("%f",Energy_h);
 
 	free(r_h);
 	free(theta_h);
