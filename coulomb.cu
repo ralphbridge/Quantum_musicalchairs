@@ -329,7 +329,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
 
 	std::vector<double> resultsE(2*N);
-	cudaMemcpyFromSymbol(&(resultsE[0],E,2*N*sizeof(double));
+	cudaMemcpyFromSymbol(&(resultsE[0]),E,2*N*sizeof(double));
 
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
