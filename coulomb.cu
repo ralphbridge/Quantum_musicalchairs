@@ -47,7 +47,7 @@ __constant__ double rmax; // Maximum spherical shell radius
 __constant__ double dt; // time step for the electron trajectory
 
 void onHost(); // Main CPU function
-void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E_h,double *pos_h,double *mom_h); // Main GPU function
+void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom,double *Energy); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
@@ -116,6 +116,7 @@ void onHost(){
 	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
 	double *pos_h,*mom_h; // Cartesian variables (N in total for position and N in total for momentum)
 	double *E_h; // Electric field (just for debugging)
+	double *Energy_h; // Total initial and final energy
 	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
 
@@ -133,7 +134,9 @@ void onHost(){
 	
 	E_h=(double*)malloc(3*N*sizeof(double));
 
-	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
+	Energy_h=(double*)malloc(2*N*sizeof(double));
+
+	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h,Energy_h); // GPU function that computes the randomly generated positions
 
 	/*myfile.open(x_vec);
 	if(myfile.is_open()){
@@ -177,9 +180,10 @@ void onHost(){
 	free(pos_h);
 	free(mom_h);
 	free(E_h);
+	free(Energy_h);
 }
 
-void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h){
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h,double *Energy_h){
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
@@ -232,6 +236,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double *p_d,*theta_p_d,*phi_p_d;
 	double *r,*p; // Device position and momentum variables in cartesian coordinates
 	double *E;
+	double *Energy;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -258,6 +263,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&p,3*N*sizeof(double));
 	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
+
+	cudaMalloc((void**)&Energy,2*N*sizeof(double));
 
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
@@ -311,7 +318,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	//cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	paths_euler<<<blocks,TPB>>>(r,p,E);
+	paths_euler<<<blocks,TPB>>>(r,p,E,Energy);
+
+	//Energy GPU to CPU migration
+	cudaMemcpy(Energy_h,Energy,2*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	int dsizes=12*steps*N;
 
@@ -320,8 +330,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
-	char filename_t[80];
+	char filename_t[80],filename_e[80];
 	strftime (filename_t,80,"trajectories%b%d_%H_%M.txt",now);
+	strftime (filename_e,80,"energies%b%d_%H_%M.txt",now);
 
 	std::cout.precision(15);
 	std::ofstream myfile;
@@ -335,7 +346,17 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		}
 		std::cout << '\n';
 		myfile.close();
-	} // added 12th variable
+	}
+
+	myfile.open(filename_e);
+
+	if(myfile.is_open()){
+		for(unsigned i=0;i<Energy_h.size()-1;i=i+2){
+			myfile << std::scientific << Energy_h[i] << ',' << Energy_h[i+1] << '\n';
+		}
+		std::cout << '\n';
+		myfile.close();
+	}
 
 	cudaFree(devStates_r);
 	cudaFree(r_d);
@@ -348,6 +369,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaFree(r);
 	cudaFree(p);
 	cudaFree(E);
+	cudaFree(Energy);
 	cudaFree(dev_traj);
 	cudaFree(dev_count);
 }
@@ -463,7 +485,7 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 */
 
 //__global__ void paths_euler(double *k,double *angles,double *pos){
-__global__ void paths_euler(double *r,double *p,double *E){
+__global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
 	unsigned int iter=0;
@@ -479,6 +501,14 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		double vzn=0;*/
 
 		//double R1,R2;
+		Energy[idx]=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
+
+		for(int i=0;i<N;i==){
+			if(i!=idx){
+				Energy[idx]=Energy[idx]+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
+			}
+			Energy[idx]=Energy[idx]+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+		}
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			//if(iter==0){
@@ -526,5 +556,13 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			__syncthreads();
 		}
 		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
+		Energy[idx]=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
+
+		for(int i=0;i<N;i==){
+			if(i!=idx){
+				Energy[idx+1]=Energy[idx+1]+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
+			}
+			Energy[idx+1]=Energy[idx+1]+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+		}
 	}
 }
