@@ -54,7 +54,7 @@ __global__ void rndvecs(double *x,curandState *state,int option,int n);
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new);
-__global__ void paths_euler(double *r,double *p,double *E);
+__global__ void paths_euler(double *r,double *p,double *E,double *Energy);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
@@ -328,6 +328,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
 
+	std::vector<double> resultsE(2*N);
+	cudaMemcpyFromSymbol(&(resultsE[0],E,2*N*sizeof(double));
+
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
 	char filename_t[80],filename_e[80];
@@ -503,7 +506,7 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 		//double R1,R2;
 		Energy[idx]=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
 
-		for(int i=0;i<N;i==){
+		for(int i=0;i<N;i++){
 			if(i!=idx){
 				Energy[idx]=Energy[idx]+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 			}
@@ -558,7 +561,7 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
 		Energy[idx]=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
 
-		for(int i=0;i<N;i==){
+		for(int i=0;i<N;i++){
 			if(i!=idx){
 				Energy[idx+1]=Energy[idx+1]+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 			}
