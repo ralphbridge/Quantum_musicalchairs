@@ -354,7 +354,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	myfile.open(filename_e);
 
 	if(myfile.is_open()){
-		for(unsigned i=0;i<N;i=i+3){
+		for(unsigned i=0;i<N;i=i+2){
 			myfile << std::scientific << Energy_h[i] << ',' << Energy_h[i+1] << '\n';
 		}
 		std::cout << '\n';
