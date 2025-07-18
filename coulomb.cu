@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 100 // Number of electrons
+#define N 2 // Number of electrons
 
 #define steps 50000 // Maximum allowed number of steps to kill simulation
 
@@ -354,7 +354,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	myfile.open(filename_e);
 
 	if(myfile.is_open()){
-		for(unsigned i=0;i<resultsE.size()-1;i=i+2){
+		for(unsigned i=0;i<N;i=i+3){
 			myfile << std::scientific << Energy_h[i] << ',' << Energy_h[i+1] << '\n';
 		}
 		std::cout << '\n';
