@@ -467,7 +467,7 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 */
 
 //__global__ void paths_euler(double *k,double *angles,double *pos){
-__global__ void paths_euler(double *r,double *p,double *E,double *Energy){
+__global__ void paths_euler(double *r,double *p,double *E){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
 	unsigned int iter=0;
@@ -483,7 +483,7 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 		double vzn=0;*/
 
 		//double R1,R2;
-		Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
+		double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
 
 		for(int i=0;i<N;i++){
 			if(i!=idx){
