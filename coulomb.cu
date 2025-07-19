@@ -486,9 +486,9 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				Energy=Energy+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
+				Energy=Energy+k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 			}
-			Energy=Energy+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+			Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 		}
 		while(r[3*idx+2]<=zdet && iter<steps){
 			//if(iter==0){
