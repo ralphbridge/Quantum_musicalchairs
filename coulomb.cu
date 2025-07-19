@@ -47,31 +47,32 @@ __constant__ double rmax; // Maximum spherical shell radius
 __constant__ double dt; // time step for the electron trajectory
 
 void onHost(); // Main CPU function
-void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom,double *Energy); // Main GPU function
+void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new);
-__global__ void paths_euler(double *r,double *p,double *E,double *Energy);
+__global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
-__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<steps){
-		dev_traj[12*steps*idx+12*dev_count[idx]]=t;
-		dev_traj[12*steps*idx+12*dev_count[idx]+1]=x;
-		dev_traj[12*steps*idx+12*dev_count[idx]+2]=y;
-		dev_traj[12*steps*idx+12*dev_count[idx]+3]=z;
-		dev_traj[12*steps*idx+12*dev_count[idx]+4]=vx;
-		dev_traj[12*steps*idx+12*dev_count[idx]+5]=vy;
-		dev_traj[12*steps*idx+12*dev_count[idx]+6]=vz;
-		dev_traj[12*steps*idx+12*dev_count[idx]+7]=Ex;
-		dev_traj[12*steps*idx+12*dev_count[idx]+8]=Ey;
-		dev_traj[12*steps*idx+12*dev_count[idx]+9]=Ez;
-		dev_traj[12*steps*idx+12*dev_count[idx]+10]=idx;
-		dev_traj[12*steps*idx+12*dev_count[idx]+11]=i;
+		dev_traj[13*steps*idx+13*dev_count[idx]]=t;
+		dev_traj[13*steps*idx+13*dev_count[idx]+1]=x;
+		dev_traj[13*steps*idx+13*dev_count[idx]+2]=y;
+		dev_traj[13*steps*idx+13*dev_count[idx]+3]=z;
+		dev_traj[13*steps*idx+13*dev_count[idx]+4]=vx;
+		dev_traj[13*steps*idx+13*dev_count[idx]+5]=vy;
+		dev_traj[13*steps*idx+13*dev_count[idx]+6]=vz;
+		dev_traj[13*steps*idx+13*dev_count[idx]+7]=Ex;
+		dev_traj[13*steps*idx+13*dev_count[idx]+8]=Ey;
+		dev_traj[13*steps*idx+13*dev_count[idx]+9]=Ez;
+		dev_traj[13*steps*idx+13*dev_count[idx]+10]=Energy;
+		dev_traj[13*steps*idx+13*dev_count[idx]+11]=idx;
+		dev_traj[13*steps*idx+13*dev_count[idx]+12]=i;
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
@@ -134,9 +135,7 @@ void onHost(){
 	
 	E_h=(double*)malloc(3*N*sizeof(double));
 
-	Energy_h=(double*)malloc(2*N*sizeof(double));
-
-	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h,Energy_h); // GPU function that computes the randomly generated positions
+	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
 
 	/*myfile.open(x_vec);
 	if(myfile.is_open()){
@@ -180,10 +179,9 @@ void onHost(){
 	free(pos_h);
 	free(mom_h);
 	free(E_h);
-	free(Energy_h);
 }
 
-void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h,double *Energy_h){
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h){
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
@@ -236,7 +234,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double *p_d,*theta_p_d,*phi_p_d;
 	double *r,*p; // Device position and momentum variables in cartesian coordinates
 	double *E;
-	double *Energy;
 
 	printf("Coulomb explosion\n");
 	printf("Number of particles (N): %d\n",N);
@@ -263,8 +260,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&p,3*N*sizeof(double));
 	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
-
-	cudaMalloc((void**)&Energy,2*N*sizeof(double));
 
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
@@ -318,44 +313,29 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//E field GPU to CPU migration(for debugging only)
 	//cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
-	paths_euler<<<blocks,TPB>>>(r,p,E,Energy);
+	paths_euler<<<blocks,TPB>>>(r,p,E);
 
 	//Energy GPU to CPU migration
-	cudaMemcpy(Energy_h,Energy,2*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	int dsizes=12*steps*N;
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
 
-	std::vector<double> resultsE(2*N);
-	cudaMemcpyFromSymbol(&(resultsE[0]),E,2*N*sizeof(double));
-
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
-	char filename_t[80],filename_e[80];
+	char filename_t[80];
 	strftime (filename_t,80,"trajectories%b%d_%H_%M.txt",now);
-	strftime (filename_e,80,"energies%b%d_%H_%M.txt",now);
 
 	std::cout.precision(15);
 	std::ofstream myfile;
 	myfile.open(filename_t);
 
 	if(myfile.is_open()){
-		for(unsigned i=0;i<results.size()-1;i=i+12){
+		for(unsigned i=0;i<results.size()-1;i=i+13){
 			if(results[i]+results[i+1]!=0){ // Check this condition, I do not understand why I put it there
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << std::defaultfloat << static_cast<int>(results[i+10]) << ',' << static_cast<int>(results[i+11]) << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
 			}
-		}
-		std::cout << '\n';
-		myfile.close();
-	}
-
-	myfile.open(filename_e);
-
-	if(myfile.is_open()){
-		for(unsigned i=0;i<N;i=i+2){
-			myfile << std::scientific << Energy_h[i] << ',' << Energy_h[i+1] << '\n';
 		}
 		std::cout << '\n';
 		myfile.close();
@@ -372,7 +352,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaFree(r);
 	cudaFree(p);
 	cudaFree(E);
-	cudaFree(Energy);
 	cudaFree(dev_traj);
 	cudaFree(dev_count);
 }
@@ -504,18 +483,17 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 		double vzn=0;*/
 
 		//double R1,R2;
-		Energy[idx]=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
+		Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
 
 		for(int i=0;i<N;i++){
 			if(i!=idx){
-				Energy[idx]=Energy[idx]+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
+				Energy=Energy+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 			}
-			Energy[idx]=Energy[idx]+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+			Energy=Energy+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
 		}
-		printf("Energy %f J for particle %d \n",Energy[idx],idx);
 		while(r[3*idx+2]<=zdet && iter<steps){
 			//if(iter==0){
-			my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
+			my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 			//}
 
 			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
@@ -558,15 +536,6 @@ __global__ void paths_euler(double *r,double *p,double *E,double *Energy){
 			++iter;
 			__syncthreads();
 		}
-		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx,iter);
-		Energy[idx]=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
-
-		for(int i=0;i<N;i++){
-			if(i!=idx){
-				Energy[idx+1]=Energy[idx+1]+k*q*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
-			}
-			Energy[idx+1]=Energy[idx+1]+k*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-		}
-		printf("Energy %f J for particle %d \n",Energy[idx],idx);
+		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 	}
 }
