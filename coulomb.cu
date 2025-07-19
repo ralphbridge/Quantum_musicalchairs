@@ -117,7 +117,6 @@ void onHost(){
 	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
 	double *pos_h,*mom_h; // Cartesian variables (N in total for position and N in total for momentum)
 	double *E_h; // Electric field (just for debugging)
-	double *Energy_h; // Total initial and final energy
 	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
 
