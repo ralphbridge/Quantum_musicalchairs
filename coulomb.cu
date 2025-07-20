@@ -20,11 +20,11 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define N 2 // Number of electrons
+#define N 100 // Number of electrons
 
-#define steps 50000 // Maximum allowed number of steps to kill simulation
+#define steps 10000 // Maximum allowed number of steps to kill simulation
 
-__device__ double dev_traj[12*steps*N]; // Record single paths (both positions and velocities)
+__device__ double dev_traj[13*steps*N]; // Record single paths (both positions and velocities)
  
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -316,7 +316,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	//Energy GPU to CPU migration
 
-	int dsizes=12*steps*N;
+	int dsizes=13*steps*N;
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
