@@ -372,15 +372,15 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}else if(opt==4){ // Random momenta magnitude
 			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
-			//vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
-			vec[idx]=0;
+			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
+			//vec[idx]=0;
 		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
-			//vec[idx]=pi*curand_uniform(&localState)-pi/2.0; // See comment two lines above
-			vec[idx]=0;
+			vec[idx]=pi*curand_uniform(&localState)-pi/2.0; // See comment two lines above
+			//vec[idx]=0;
 		}else if(opt==6){ // Random momentum azimuthal angles
-			//vec[idx]=2.0*pi*curand_uniform(&localState);
-			vec[idx]=0;
+			vec[idx]=2.0*pi*curand_uniform(&localState);
+			//vec[idx]=0;
 		}
 		globalState[idx]=localState; // Update current seed state
 	}
