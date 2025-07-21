@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define traj 1 // 1 for tracking trajectories, 0 for not tracking them
+#define traj 0 // 1 for tracking trajectories, 0 for not tracking them
 
 #define N 100 // Number of electrons
 
