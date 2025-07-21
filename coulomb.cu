@@ -96,10 +96,6 @@ void onHost(){
 
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
-	//char x_vec[80],x_vec_cart[80],E_vec[80];
-	//strftime(x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
-	//strftime(x_vec_cart,80,"initialconditionscart%b%d_%H_%M.txt",now);
-	//strftime(E_vec,80,"Efield%b%d_%H_%M.txt",now);
 
 	std::cout.precision(15);
 	std::ofstream myfile;
@@ -117,8 +113,6 @@ void onHost(){
 	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
 	double *pos_h,*mom_h; // Cartesian variables (N in total for position and N in total for momentum)
 	double *E_h; // Electric field (just for debugging)
-	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
-	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
 
 	r_h=(double*)malloc(N*sizeof(double));
 	theta_h=(double*)malloc(N*sizeof(double));
@@ -135,33 +129,6 @@ void onHost(){
 	E_h=(double*)malloc(3*N*sizeof(double));
 
 	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
-
-	/*myfile.open(x_vec);
-	if(myfile.is_open()){
-		for(unsigned i=0;i<N;i++){
-			myfile << std::scientific << r_h[i] << ',' << theta_h[i] << ',' << phi_h[i]  << ',' << p_h[i]  << ',' << theta_p_h[i]  << ',' << phi_p_h[i] << '\n';
-		}
-		std::cout << '\n';
-		myfile.close();
-	}
-
-	myfile.open(x_vec_cart);
-	if(myfile.is_open()){
-		for(unsigned i=0;i<3*N;i=i+3){
-			myfile << std::scientific << pos_h[i] << ',' << pos_h[i+1] << ',' << pos_h[i+2] << ',' << mom_h[i] << ',' << mom_h[i+1] << ',' << mom_h[i+2] << '\n';
-		}
-		std::cout << '\n';
-		myfile.close();
-	}
-
-	myfile.open(E_vec);
-	if(myfile.is_open()){
-		for(unsigned i=0;i<3*N;i=i+3){
-			myfile << std::scientific << E_h[i] << ',' << E_h[i+1] << ',' << E_h[i+2] << '\n';
-		}
-		std::cout << '\n';
-		myfile.close();
-	}*/
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -200,12 +167,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
-	//double zdet_h=10e-2; // Detector position
 	double zdet_h=10e-6;
 
 	double rmin_h=0.0;
 	double rmax_h=1e-6;
-	//double rmax_h=rtip_h/10;
 
 	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
@@ -276,10 +241,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//phi
 	rndvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
 
-	//cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	
 	curandState *devStates_p;
 	cudaMalloc(&devStates_p,N*sizeof(curandState));
 	
@@ -295,26 +256,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	//phi_p
 	rndvecs<<<blocks,TPB>>>(phi_p_d,devStates_p,6,N);
-
-	//cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
 	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
 	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
-	
-	//cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	Efield<<<blocks,TPB>>>(r,E);
-	
-	//E field GPU to CPU migration(for debugging only)
-	//cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
-
-	//Energy GPU to CPU migration
 
 	int dsizes=13*steps*N;
 
@@ -396,14 +345,6 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
-		/*if(idx==0){
-			vec[3*idx+1]=0.01*rmax;
-		}else{
-			vec[3*idx+1]=-0.01*rmax;
-		}
-		vec[3*idx]=0;
-		__syncthreads();
-		vec[3*idx+2]=rtip+rmax;*/
 	}
 }
 
@@ -465,7 +406,6 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 }
 */
 
-//__global__ void paths_euler(double *k,double *angles,double *pos){
 __global__ void paths_euler(double *r,double *p,double *E){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
@@ -477,9 +417,6 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		double vxn=p[3*idx]/m;
 		double vyn=p[3*idx+1]/m;
 		double vzn=p[3*idx+2]/m;
-		/*double vxn=0;
-		double vyn=0;
-		double vzn=0;*/
 
 		//double R1,R2;
 		double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
