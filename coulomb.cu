@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define traj 0 // 1 for tracking trajectories, 0 for not tracking them
 
-#define N 100 // Number of electrons
+#define N 2 // Number of electrons
 
 #define steps 10000 // Maximum allowed number of steps to kill simulation
 
@@ -87,7 +87,7 @@ __device__ unsigned int dev_count[N]; // Global index that counts (per thread) i
 	}
 #else
 	__device__ void my_push_back(double const &x,double const &y,double const &z,int const &idx){ // Function that loads positions into device memory per thread
-		if(dev_count[idx]<steps){
+		if(dev_count[idx]<2){
 			dev_traj[4*steps*idx+4*dev_count[idx]]=x;
 			dev_traj[4*steps*idx+4*dev_count[idx]+1]=y;
 			dev_traj[4*steps*idx+4*dev_count[idx]+2]=z;
