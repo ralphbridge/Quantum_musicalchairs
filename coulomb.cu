@@ -284,10 +284,13 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	Efield<<<blocks,TPB>>>(r,E);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
+
+	int dsizes;
+
 	if(traj==1){
-		int dsizes=13*steps*N;
+		dsizes=13*steps*N;
 	}else{
-		int dsizes=4*2*N;
+		dsizes=4*2*N;
 	}
 
 	std::vector<double> results(dsizes);
