@@ -20,7 +20,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define traj 1 // 1 for tracking trajectories, 0 for not tracking them
+#define traj 0 // 1 for tracking trajectories, 0 for not tracking them
 
 #define N 100 // Number of electrons
 
@@ -29,7 +29,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 #if traj==1
 	__device__ double dev_traj[13*steps*N]; // Record single paths (both positions and velocities)
 #else
-	__device__ double dev_traj[4*2*N]; // Only records initial and final values per particle
+	__device__ double dev_traj[13*2*N]; // Only records initial and final values per particle
 #endif 
  
 __constant__ double pi;
