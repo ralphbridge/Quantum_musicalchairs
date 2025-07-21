@@ -25,7 +25,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 #define steps 10000 // Maximum allowed number of steps to kill simulation
 
 __device__ double dev_traj[13*steps*N]; // Record single paths (both positions and velocities)
- 
+
 __constant__ double pi;
 __constant__ double q; // electron charge
 __constant__ double m; // electron rest mass
@@ -135,33 +135,6 @@ void onHost(){
 	E_h=(double*)malloc(3*N*sizeof(double));
 
 	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
-
-	/*myfile.open(x_vec);
-	if(myfile.is_open()){
-		for(unsigned i=0;i<N;i++){
-			myfile << std::scientific << r_h[i] << ',' << theta_h[i] << ',' << phi_h[i]  << ',' << p_h[i]  << ',' << theta_p_h[i]  << ',' << phi_p_h[i] << '\n';
-		}
-		std::cout << '\n';
-		myfile.close();
-	}
-
-	myfile.open(x_vec_cart);
-	if(myfile.is_open()){
-		for(unsigned i=0;i<3*N;i=i+3){
-			myfile << std::scientific << pos_h[i] << ',' << pos_h[i+1] << ',' << pos_h[i+2] << ',' << mom_h[i] << ',' << mom_h[i+1] << ',' << mom_h[i+2] << '\n';
-		}
-		std::cout << '\n';
-		myfile.close();
-	}
-
-	myfile.open(E_vec);
-	if(myfile.is_open()){
-		for(unsigned i=0;i<3*N;i=i+3){
-			myfile << std::scientific << E_h[i] << ',' << E_h[i+1] << ',' << E_h[i+2] << '\n';
-		}
-		std::cout << '\n';
-		myfile.close();
-	}*/
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -295,27 +268,16 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	//phi_p
 	rndvecs<<<blocks,TPB>>>(phi_p_d,devStates_p,6,N);
-
-	//cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	
 	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
 	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
-	
-	//cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	//cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	Efield<<<blocks,TPB>>>(r,E);
-	
-	//E field GPU to CPU migration(for debugging only)
-	//cudaMemcpy(E_h,E,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
 	//Energy GPU to CPU migration
-
 	int dsizes=13*steps*N;
 
 	std::vector<double> results(dsizes);
@@ -396,14 +358,6 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
-		/*if(idx==0){
-			vec[3*idx+1]=0.01*rmax;
-		}else{
-			vec[3*idx+1]=-0.01*rmax;
-		}
-		vec[3*idx]=0;
-		__syncthreads();
-		vec[3*idx+2]=rtip+rmax;*/
 	}
 }
 
