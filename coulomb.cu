@@ -308,7 +308,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	if(traj==1){
 		if(myfile.is_open()){
 			for(unsigned i=0;i<results.size()-1;i=i+13){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
+				if(results[i]+results[i+1]!=0){ // To make sure no rows of zeroes from dev_traj make it to the trajectories file
+					myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
+				}
 			}
 			std::cout << '\n';
 			myfile.close();
@@ -316,7 +318,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	}else{
 		if(myfile.is_open()){
 			for(unsigned i=0;i<results.size()-1;i=i+4){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << std::defaultfloat << static_cast<int>(results[i+3]) << '\n';
+				if(results[i]+results[i+1]!=0){
+					myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << std::defaultfloat << static_cast<int>(results[i+3]) << '\n';
+				}
 			}
 			std::cout << '\n';
 			myfile.close();
