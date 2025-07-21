@@ -20,9 +20,9 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
-#define traj 0 // 1 for tracking trajectories, 0 for not tracking them
+#define traj 1 // 1 for tracking trajectories, 0 for not tracking them
 
-#define N 2 // Number of electrons
+#define N 100 // Number of electrons
 
 #define steps 10000 // Maximum allowed number of steps to kill simulation
 
@@ -86,12 +86,21 @@ __device__ unsigned int dev_count[N]; // Global index that counts (per thread) i
 		}
 	}
 #else
-	__device__ void my_push_back(double const &x,double const &y,double const &z,int const &idx){ // Function that loads positions into device memory per thread
+	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 		if(dev_count[idx]<2){
-			dev_traj[4*steps*idx+4*dev_count[idx]]=x;
-			dev_traj[4*steps*idx+4*dev_count[idx]+1]=y;
-			dev_traj[4*steps*idx+4*dev_count[idx]+2]=z;
-			dev_traj[4*steps*idx+4*dev_count[idx]+3]=idx;
+			dev_traj[13*2*idx+13*dev_count[idx]]=t;
+			dev_traj[13*2*idx+13*dev_count[idx]+1]=x;
+			dev_traj[13*2*idx+13*dev_count[idx]+2]=y;
+			dev_traj[13*2*idx+13*dev_count[idx]+3]=z;
+			dev_traj[13*2*idx+13*dev_count[idx]+4]=vx;
+			dev_traj[13*2*idx+13*dev_count[idx]+5]=vy;
+			dev_traj[13*2*idx+13*dev_count[idx]+6]=vz;
+			dev_traj[13*2*idx+13*dev_count[idx]+7]=Ex;
+			dev_traj[13*2*idx+13*dev_count[idx]+8]=Ey;
+			dev_traj[13*2*idx+13*dev_count[idx]+9]=Ez;
+			dev_traj[13*2*idx+13*dev_count[idx]+10]=Energy;
+			dev_traj[13*2*idx+13*dev_count[idx]+11]=idx;
+			dev_traj[13*2*idx+13*dev_count[idx]+12]=i;
 			dev_count[idx]=dev_count[idx]+1;
 		}else{
 			printf("Overflow error in pushback\n");
@@ -290,7 +299,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	if(traj==1){
 		dsizes=13*steps*N;
 	}else{
-		dsizes=4*2*N;
+		dsizes=13*2*N;
 	}
 
 	std::vector<double> results(dsizes);
@@ -305,26 +314,14 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	std::ofstream myfile;
 	myfile.open(filename_t);
 
-	if(traj==1){
-		if(myfile.is_open()){
-			for(unsigned i=0;i<results.size()-1;i=i+13){
-				if(results[i]+results[i+1]!=0){ // To make sure no rows of zeroes from dev_traj make it to the trajectories file
-					myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
-				}
+	if(myfile.is_open()){
+		for(unsigned i=0;i<results.size()-1;i=i+13){
+			if(results[i]+results[i+1]!=0){ // To make sure no rows of zeroes from dev_traj make it to the trajectories file
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
 			}
-			std::cout << '\n';
-			myfile.close();
 		}
-	}else{
-		if(myfile.is_open()){
-			for(unsigned i=0;i<results.size()-1;i=i+4){
-				if(results[i]+results[i+1]!=0){
-					myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << std::defaultfloat << static_cast<int>(results[i+3]) << '\n';
-				}
-			}
-			std::cout << '\n';
-			myfile.close();
-		}
+		std::cout << '\n';
+		myfile.close();
 	}
 
 	cudaFree(devStates_r);
@@ -443,133 +440,75 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 	}
 }
 */
-#if traj==1
-	__global__ void paths_euler(double *r,double *p,double *E){
-		unsigned int idx=threadIdx.x+blockIdx.x*TPB;
+__global__ void paths_euler(double *r,double *p,double *E){
+	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
-		unsigned int iter=0;
+	unsigned int iter=0;
 
-		if(idx<N){
-			double tn=0.0;
+	if(idx<N){
+		double tn=0.0;
 
-			double vxn=p[3*idx]/m;
-			double vyn=p[3*idx+1]/m;
-			double vzn=p[3*idx+2]/m;
+		double vxn=p[3*idx]/m;
+		double vyn=p[3*idx+1]/m;
+		double vzn=p[3*idx+2]/m;
 
-			//double R1,R2;
-			double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
+		//double R1,R2;
+		double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
 
-			for(int i=0;i<N;i++){
-				if(i!=idx){
-					Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
-				}
+		for(int i=0;i<N;i++){
+			if(i!=idx){
+				Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 			}
+		}
 			
-			Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-			while(r[3*idx+2]<=zdet && iter<steps){
+		Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+		while(r[3*idx+2]<=zdet && iter<steps){
+			if(traj==1){
 				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-
-				vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
-				vyn=vyn+dt*q*E[3*idx+1]/m;
-				vzn=vzn+dt*q*E[3*idx+2]/m;
-
-				E[3*idx]=0; // Initializing E filed at the particle position for each iteration
-				E[3*idx+1]=0;
-				E[3*idx+2]=0;
-
-				tn=tn+dt;
-
-				r[3*idx]=r[3*idx]+dt*vxn;
-				r[3*idx+1]=r[3*idx+1]+dt*vyn;
-				r[3*idx+2]=r[3*idx+2]+dt*vzn;
-
-				for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
-					if(i!=idx && r[3*i+2]<zdet){
-						E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-						E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-						E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					}
-				}
-				// Radial Electric field from the tip
-				E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-				E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-				E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-
-				// Electric field from the tip using method of images
-				/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-				__syncthreads();
-				R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
-				__syncthreads();
-				E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-				__syncthreads();
-				E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-				__syncthreads();
-				E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
-
-				++iter;
-				__syncthreads();
+			}else if(iter==0){
+				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 			}
-			my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-		}
-	}
-#else
-	__global__ void paths_euler(double *r,double *p,double *E){
-		unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
-		unsigned int iter=0;
+			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
+			vyn=vyn+dt*q*E[3*idx+1]/m;
+			vzn=vzn+dt*q*E[3*idx+2]/m;
 
-		if(idx<N){
-			double tn=0.0;
+			E[3*idx]=0; // Initializing E filed at the particle position for each iteration
+			E[3*idx+1]=0;
+			E[3*idx+2]=0;
 
-			double vxn=p[3*idx]/m;
-			double vyn=p[3*idx+1]/m;
-			double vzn=p[3*idx+2]/m;
+			tn=tn+dt;
 
-			//double R1,R2;
-			while(r[3*idx+2]<=zdet && iter<steps){
-				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],idx);
+			r[3*idx]=r[3*idx]+dt*vxn;
+			r[3*idx+1]=r[3*idx+1]+dt*vyn;
+			r[3*idx+2]=r[3*idx+2]+dt*vzn;
 
-				vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
-				vyn=vyn+dt*q*E[3*idx+1]/m;
-				vzn=vzn+dt*q*E[3*idx+2]/m;
-
-				E[3*idx]=0; // Initializing E filed at the particle position for each iteration
-				E[3*idx+1]=0;
-				E[3*idx+2]=0;
-
-				tn=tn+dt;
-
-				r[3*idx]=r[3*idx]+dt*vxn;
-				r[3*idx+1]=r[3*idx+1]+dt*vyn;
-				r[3*idx+2]=r[3*idx+2]+dt*vzn;
-
-				for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
-					if(i!=idx && r[3*i+2]<zdet){
-						E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-						E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-						E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					}
+			for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
+				if(i!=idx && r[3*i+2]<zdet){
+					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
 				}
-				// Radial Electric field from the tip
-				E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-				E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-				E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-
-				// Electric field from the tip using method of images
-				/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-				__syncthreads();
-				R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
-				__syncthreads();
-				E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-				__syncthreads();
-				E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-				__syncthreads();
-				E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
-
-				++iter;
-				__syncthreads();
 			}
-			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],idx);
+			// Radial Electric field from the tip
+			E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+			E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+			E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+
+			// Electric field from the tip using method of images
+			/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+			__syncthreads();
+			R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
+			__syncthreads();
+			E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			__syncthreads();
+			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+			__syncthreads();
+			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
+
+			++iter;
+			__syncthreads();
 		}
+		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 	}
-#endif
+}
