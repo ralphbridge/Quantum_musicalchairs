@@ -316,7 +316,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	}else{
 		if(myfile.is_open()){
 			for(unsigned i=0;i<results.size()-1;i=i+4){
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' std::defaultfloat << static_cast<int>(results[i+3]) << '\n';
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << std::defaultfloat << static_cast<int>(results[i+3]) << '\n';
 			}
 			std::cout << '\n';
 			myfile.close();
@@ -439,79 +439,133 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 	}
 }
 */
+#if traj==1
+	__global__ void paths_euler(double *r,double *p,double *E){
+		unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
-__global__ void paths_euler(double *r,double *p,double *E){
-	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
+		unsigned int iter=0;
 
-	unsigned int iter=0;
+		if(idx<N){
+			double tn=0.0;
 
-	if(idx<N){
-		double tn=0.0;
+			double vxn=p[3*idx]/m;
+			double vyn=p[3*idx+1]/m;
+			double vzn=p[3*idx+2]/m;
 
-		double vxn=p[3*idx]/m;
-		double vyn=p[3*idx+1]/m;
-		double vzn=p[3*idx+2]/m;
+			//double R1,R2;
+			double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
 
-		//double R1,R2;
-		double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
-
-		for(int i=0;i<N;i++){
-			if(i!=idx){
-				Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
-			}
-		}
-		Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-		while(r[3*idx+2]<=zdet && iter<steps){
-			if(traj==1){
-				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-			}else{
-				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],idx);
-			}
-
-			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
-			vyn=vyn+dt*q*E[3*idx+1]/m;
-			vzn=vzn+dt*q*E[3*idx+2]/m;
-
-			E[3*idx]=0; // Initializing E filed at the particle position for each iteration
-			E[3*idx+1]=0;
-			E[3*idx+2]=0;
-
-			tn=tn+dt;
-
-			r[3*idx]=r[3*idx]+dt*vxn;
-			r[3*idx+1]=r[3*idx+1]+dt*vyn;
-			r[3*idx+2]=r[3*idx+2]+dt*vzn;
-
-			for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
-				if(i!=idx && r[3*i+2]<zdet){
-					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+			for(int i=0;i<N;i++){
+				if(i!=idx){
+					Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 				}
 			}
-			// Radial Electric field from the tip
-			E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-			E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-			E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+			
+			Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+			while(r[3*idx+2]<=zdet && iter<steps){
+				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 
-			// Electric field from the tip using method of images
-			/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-			__syncthreads();
-			R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
-			__syncthreads();
-			E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-			__syncthreads();
-			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-			__syncthreads();
-			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
+				vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
+				vyn=vyn+dt*q*E[3*idx+1]/m;
+				vzn=vzn+dt*q*E[3*idx+2]/m;
 
-			++iter;
-			__syncthreads();
-		}
-		if(traj==1){
+				E[3*idx]=0; // Initializing E filed at the particle position for each iteration
+				E[3*idx+1]=0;
+				E[3*idx+2]=0;
+
+				tn=tn+dt;
+
+				r[3*idx]=r[3*idx]+dt*vxn;
+				r[3*idx+1]=r[3*idx+1]+dt*vyn;
+				r[3*idx+2]=r[3*idx+2]+dt*vzn;
+
+				for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
+					if(i!=idx && r[3*i+2]<zdet){
+						E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+						E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+						E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+					}
+				}
+				// Radial Electric field from the tip
+				E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+				E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+				E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+
+				// Electric field from the tip using method of images
+				/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+				__syncthreads();
+				R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
+				__syncthreads();
+				E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				__syncthreads();
+				E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				__syncthreads();
+				E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
+
+				++iter;
+				__syncthreads();
+			}
 			my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-		}else{
+		}
+	}
+#else
+	__global__ void paths_euler(double *r,double *p,double *E){
+		unsigned int idx=threadIdx.x+blockIdx.x*TPB;
+
+		unsigned int iter=0;
+
+		if(idx<N){
+			double tn=0.0;
+
+			double vxn=p[3*idx]/m;
+			double vyn=p[3*idx+1]/m;
+			double vzn=p[3*idx+2]/m;
+
+			//double R1,R2;
+			while(r[3*idx+2]<=zdet && iter<steps){
+				my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],idx);
+
+				vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
+				vyn=vyn+dt*q*E[3*idx+1]/m;
+				vzn=vzn+dt*q*E[3*idx+2]/m;
+
+				E[3*idx]=0; // Initializing E filed at the particle position for each iteration
+				E[3*idx+1]=0;
+				E[3*idx+2]=0;
+
+				tn=tn+dt;
+
+				r[3*idx]=r[3*idx]+dt*vxn;
+				r[3*idx+1]=r[3*idx+1]+dt*vyn;
+				r[3*idx+2]=r[3*idx+2]+dt*vzn;
+
+				for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
+					if(i!=idx && r[3*i+2]<zdet){
+						E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+						E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+						E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
+					}
+				}
+				// Radial Electric field from the tip
+				E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+				E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+				E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
+
+				// Electric field from the tip using method of images
+				/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+				__syncthreads();
+				R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
+				__syncthreads();
+				E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				__syncthreads();
+				E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
+				__syncthreads();
+				E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
+
+				++iter;
+				__syncthreads();
+			}
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],idx);
 		}
 	}
-}
+#endif
