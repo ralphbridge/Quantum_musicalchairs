@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define traj 0 // 1 for tracking trajectories, 0 for not tracking them
 
-#define N 50000 // Number of electrons
+#define N 100 // Number of electrons
 
 #define steps 10000 // Maximum allowed number of steps to kill simulation
 
