@@ -196,7 +196,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
-	double zdet_h=10e-6;
+	double zdet_h=100e-6;
 
 	double rmin_h=0.0;
 	double rmax_h=1e-6;
