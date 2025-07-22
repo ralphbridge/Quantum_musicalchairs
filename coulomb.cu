@@ -29,7 +29,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 #if traj==1
 	__device__ double dev_traj[13*steps*N]; // Record single paths (both positions and velocities)
 #else
-	__device__ double dev_traj[13*2*N]; // Only records initial and final values per particle
+	__device__ double dev_traj[13*3*N]; // Only records initial and final values per particle
 #endif 
  
 __constant__ double pi;
@@ -87,20 +87,20 @@ __device__ unsigned int dev_count[N]; // Global index that counts (per thread) i
 	}
 #else
 	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
-		if(dev_count[idx]<2){
-			dev_traj[13*2*idx+13*dev_count[idx]]=t;
-			dev_traj[13*2*idx+13*dev_count[idx]+1]=x;
-			dev_traj[13*2*idx+13*dev_count[idx]+2]=y;
-			dev_traj[13*2*idx+13*dev_count[idx]+3]=z;
-			dev_traj[13*2*idx+13*dev_count[idx]+4]=vx;
-			dev_traj[13*2*idx+13*dev_count[idx]+5]=vy;
-			dev_traj[13*2*idx+13*dev_count[idx]+6]=vz;
-			dev_traj[13*2*idx+13*dev_count[idx]+7]=Ex;
-			dev_traj[13*2*idx+13*dev_count[idx]+8]=Ey;
-			dev_traj[13*2*idx+13*dev_count[idx]+9]=Ez;
-			dev_traj[13*2*idx+13*dev_count[idx]+10]=Energy;
-			dev_traj[13*2*idx+13*dev_count[idx]+11]=idx;
-			dev_traj[13*2*idx+13*dev_count[idx]+12]=i;
+		if(dev_count[idx]<3){
+			dev_traj[13*3*idx+13*dev_count[idx]]=t;
+			dev_traj[13*3*idx+13*dev_count[idx]+1]=x;
+			dev_traj[13*3*idx+13*dev_count[idx]+2]=y;
+			dev_traj[13*3*idx+13*dev_count[idx]+3]=z;
+			dev_traj[13*3*idx+13*dev_count[idx]+4]=vx;
+			dev_traj[13*3*idx+13*dev_count[idx]+5]=vy;
+			dev_traj[13*3*idx+13*dev_count[idx]+6]=vz;
+			dev_traj[13*3*idx+13*dev_count[idx]+7]=Ex;
+			dev_traj[13*3*idx+13*dev_count[idx]+8]=Ey;
+			dev_traj[13*3*idx+13*dev_count[idx]+9]=Ez;
+			dev_traj[13*3*idx+13*dev_count[idx]+10]=Energy;
+			dev_traj[13*3*idx+13*dev_count[idx]+11]=idx;
+			dev_traj[13*3*idx+13*dev_count[idx]+12]=i;
 			dev_count[idx]=dev_count[idx]+1;
 		}else{
 			printf("Overflow error in pushback\n");
@@ -299,7 +299,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	if(traj==1){
 		dsizes=13*steps*N;
 	}else{
-		dsizes=13*2*N;
+		dsizes=13*3*N;
 	}
 
 	std::vector<double> results(dsizes);
@@ -460,13 +460,18 @@ __global__ void paths_euler(double *r,double *p,double *E){
 				Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
 			}
 		}
-			
+		
 		Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+
+		int halfway=0; // Variable used to store the first set of data when each electron crosses a zdet/10;
 		while(r[3*idx+2]<=zdet && iter<steps){
 			if(traj==1){
 				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 			}else if(iter==0){
 				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+			}else if(r[3*idx+2]>zdet/10.0 && halfway==0){
+				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+				halfway=1;
 			}
 
 			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
