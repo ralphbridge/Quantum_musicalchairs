@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define traj 0 // 1 for tracking trajectories, 0 for not tracking them
 
-#define N 100 // Number of electrons
+#define N 1000 // Number of electrons
 
 #define steps 10000 // Maximum allowed number of steps to kill simulation
 
@@ -196,10 +196,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
-	double zdet_h=100e-6;
+	double zdet_h=25e-3;
 
 	double rmin_h=0.0;
-	double rmax_h=1e-6;
+	double rmax_h=296e-9;
 
 	double dt_h=zdet_h/(100*v0_h); // Think about time step
 
