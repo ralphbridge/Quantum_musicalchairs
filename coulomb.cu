@@ -201,7 +201,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double rmin_h=0.0;
 	double rmax_h=296e-9;
 
-	double dt_h=zdet_h/(10000*v0_h); // Think about time step
+	double dt_h=zdet_h/(1000*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
