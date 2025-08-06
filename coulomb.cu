@@ -196,12 +196,12 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
-	double zdet_h=2.5e-3;
+	double zdet_h=25e-3;
 
 	double rmin_h=0.0;
 	double rmax_h=296e-9;
 
-	double dt_h=zdet_h/(1000*v0_h); // Think about time step
+	double dt_h=zdet_h/(10000*v0_h); // Think about time step
 
 	cudaMemcpyToSymbol(pi,&pi_h,sizeof(double)); // Copy parameters to constant memory for optimization purposes
 	cudaMemcpyToSymbol(q,&q_h,sizeof(double));
@@ -237,6 +237,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	printf("sigmathetap=%f rad\n",sigma_theta_p_h);
 
 	printf("dt=%2.6e s\n",dt_h);
+	printf("zdet=%2.6e s\n",zdet_h);
 	
 	printf("Threads per block: %d\n",TPB);
 	printf("Number of blocks: %d\n",blocks);
