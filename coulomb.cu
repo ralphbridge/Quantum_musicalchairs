@@ -518,3 +518,4 @@ __global__ void paths_euler(double *r,double *p,double *E){
 		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
 	}
 }
+// Test
