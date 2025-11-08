@@ -1,7 +1,7 @@
 clc
 clear all
 
-str='Oct13_23_23';
+str='Oct17_12_3;
 data=readmatrix(['trajectories',str,'.txt']);
 
 N=1000;
