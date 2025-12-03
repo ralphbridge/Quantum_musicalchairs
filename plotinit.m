@@ -1,4 +1,4 @@
-str='trajectoriesAug01_00_05.txt';
+str='trajectoriesNov06_12_51.txt';
 data=readmatrix(str);
 N=size(data,1)/3;
 xi=zeros(N,1);
@@ -64,11 +64,24 @@ ylabel('$\Delta\hat{u}_z$','interpreter','latex','FontSize',20)
 xlabel('$N$','interpreter','latex','FontSize',20)
 
 figure
-plot3(xi,yi,zi,'.')
+plot3(xi*1e9,yi*1e9,zi*1e9,'.')
 axis equal;
+xlabel('x nm')
+ylabel('y nm')
+zlabel('z nm')
 title(['Initial distribution for N=',num2str(N),' electrons'])
 
 figure
-plot3(xf,yf,zf,'.')
+plot3(vx1,vy1,vz1,'.')
 axis equal;
+xlabel('x nm')
+ylabel('y nm')
+zlabel('z nm')
+title(['Initial distribution for N=',num2str(N),' electrons'])
+
+figure
+plot3(xf*1e3,yf*1e3,zf*1e3,'.')
+axis equal;
+xlabel('y mm')
+ylabel('x mm')
 title(['Distribution at detector position for N=',num2str(N),' electrons'])
