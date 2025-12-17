@@ -176,8 +176,7 @@ void onHost(){
 	free(E_h);
 }
 
-void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h)
-{
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h){
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
@@ -255,71 +254,43 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&p,3*N*sizeof(double));
 	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
+
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
 
-	double sigma_p_h=5.4e-25;		// Uniform distribution in momentum. Not energy.
-	int check;
-	int loop=0;
-	double *pauli_indices;
-	cudaMalloc((void**)&pauli_indices,N*sizeof(int));
+	//r
+	srand(time(0));
+	int seed=rand(); //Setting up the seeds
+	setup_rnd<<<blocks,TPB>>>(devStates_r,seed);
 
-	for (int i = 0; i < N; i++)
-	{
-    	pauli_indices[i] = N;		// All indices are tagged with value N
-	}
-	do
-	{
-		srand(time(0));
-		int seed=rand(); //Setting up the seeds
+	rndvecs<<<blocks,TPB>>>(r_d,devStates_r,1,N);
+
+	//theta
+	rndvecs<<<blocks,TPB>>>(theta_d,devStates_r,2,N);
+
+	//phi
+	rndvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
+
+	curandState *devStates_p;
+	cudaMalloc(&devStates_p,N*sizeof(curandState));
 	
-		setup_rnd<<<blocks,TPB>>>(devStates_r,seed);
+	//p
+	srand(time(NULL)); // <---- check if this is necessary
+	seed=rand(); //Setting up the seeds <---- check if this is necessary
+	setup_rnd<<<blocks,TPB>>>(devStates_p,seed);
+
+	rndvecs<<<blocks,TPB>>>(p_d,devStates_p,4,N);
+
+	//theta_p
+	rndvecs<<<blocks,TPB>>>(theta_p_d,devStates_p,5,N);
+
+	//phi_p
+	rndvecs<<<blocks,TPB>>>(phi_p_d,devStates_p,6,N);
 	
-		rndvecs<<<blocks,TPB>>>(r_d,pauli_indices,devStates_r,1,N);
-		rndvecs<<<blocks,TPB>>>(theta_d,pauli_indices,devStates_r,2,N);		//theta
-		rndvecs<<<blocks,TPB>>>(phi_d,pauli_indices,devStates_r,3,N);		//phi
-
-		curandState *devStates_p;
-		cudaMalloc(&devStates_p,N*sizeof(curandState));
-		
-		//p
-		srand(time(NULL)); 		// <---- check if this is necessary
-		seed=rand();		 //Setting up the seeds <---- check if this is necessary
-		setup_rnd<<<blocks,TPB>>>(devStates_p,seed);
+	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 	
-		rndvecs<<<blocks,TPB>>>(p_d,pauli_indices,devStates_p,4,N);
-		rndvecs<<<blocks,TPB>>>(theta_p_d,pauli_indices,devStates_p,5,N);		//theta_p
-		rndvecs<<<blocks,TPB>>>(phi_p_d,pauli_indices,devStates_p,6,N);		//phi_p
-		
-		sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); 		// Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
-		sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); 		// Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
-		pauli_check<<<blocks,TPB>>>(r,check,N);
+	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 
-		for(int i=0;i<N;i++)
-		{	
-
-			if(pauli_indices[i]==N+1)
-			{
-				check=0;
-			}
-			else
-			{
-				check=1;
-				cout<<"Loop"<<++loop<<"\n";
-				break;
-			}
-		}
-	} (while check==1);
-
-	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
-	
 	Efield<<<blocks,TPB>>>(r,E);
 
 	paths_euler<<<blocks,TPB>>>(r,p,E);
@@ -374,40 +345,28 @@ __global__ void setup_rnd(curandState *state,unsigned long seed){
         curand_init(seed,idx,0,&state[idx]); // Initializes the random state
 }
 
-__global__ void rndvecs(double *vec,int *pauli_indices,curandState *globalState,int opt,int n)		// Random number generation
-{ 
+__global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // Random number generation
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
-
-	if((idx<n)&&((pauli_indices[idx]!=N+1)||(pauli_indices[idx]==N))) // run if indices are either N (first assignment of random positions) or not equal to N+1 (reassignments after coherent regions are found to be crossing
-	{
-		if(opt==1)	// Random radii
-		{ 
+	if(idx<n){
+		if(opt==1){ // Random radii
 			vec[idx]=pow((pow(rmax,3.0)-pow(rmin,3.0))*curand_uniform(&localState)+pow(rmin,3.0),1.0/3.0);
-		}
-		else if(opt==2)		// Random polar angles
-		{ 
+		}else if(opt==2){ // Random polar angles
 			vec[idx]=acos(1.0-2.0*curand_uniform(&localState));
-		}
-		else if(opt==3)		// Random azimuthal angles
-		{ 
+		}else if(opt==3){ // Random azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
-		}
-		else if(opt==4)		// Random momenta magnitude
-		{ 
+		}else if(opt==4){ // Random momenta magnitude
 			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
 			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
-		}
-		else if(opt==5) 		// Random momentum polar angles
-		{ 
+			//vec[idx]=0;
+		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
-			vec[idx]=pi*curand_uniform(&localState); // See comment two lines above
-		}
-		else if(opt==6)			// Random momentum azimuthal angles
-		{ 
+			vec[idx]=pi*curand_uniform(&localState)-pi/2.0; // See comment two lines above
+			//vec[idx]=0;
+		}else if(opt==6){ // Random momentum azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
+			//vec[idx]=0;
 		}
-		pauli_indices[idx]=N+1;		//Pauli_indices[idx] assigned to be N+1 and later sent for further testing of crossing coherence regions 
 		globalState[idx]=localState; // Update current seed state
 	}
 }
@@ -421,28 +380,6 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
-		}
-	}
-}
-
-
-
-__global__ void pauli_check(int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
-{ 
-	int idx=threadIdx.x+blockIdx.x*blockDim.x;
-	double r_coh = 3e-9;	 //coherence length
-	if(idx<n)
-	{
-		for (int i=0; i<n ;i++)
-		{
-    		if (i == idx) 
-			{
-				continue;
-			}
-			if((pow(pos[3*idx]-pos[3*i],2.0) + pow(pos[3*idx+1]-pos[3*i+1],2.0) + pow(pos[3*idx+2]-pos[3*i+2],2.0)) <= pow(r_coh,2.0))
-			{
-				pauli_indices[i]=i;
-			}
 		}
 	}
 }
