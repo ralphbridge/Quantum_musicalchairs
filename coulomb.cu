@@ -255,7 +255,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&p,3*N*sizeof(double));
 	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
-
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
 
