@@ -56,10 +56,10 @@ void onHost(); // Main CPU function
 void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
-__global__ void rndvecs(double *x,curandState *state,int option,int n);
+__global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int option,int n);
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
 __global__ void Efield(double *pos,double *E);
-__global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new);
+__global__ void pauli_check(double *pos, int *pauli_indices,int n);
 __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
@@ -258,16 +258,18 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
 
-	double sigma_p_h=5.4e-25;		// Uniform distribution in momentum. Not energy.
+	curandState *devStates_p;
+	cudaMalloc(&devStates_p,N*sizeof(curandState));
+
 	int check;
 	int loop=0;
-	double *pauli_indices;
+	int *pauli_indices;
 	cudaMalloc((void**)&pauli_indices,N*sizeof(int));
+	std::vector<int> pauli_host(N, N);  // creates memory inside CPU for pauli_indices values. Here it is an N sized array with all entries being N
+	// All indices are tagged with value N for unassigned positions
+	
+	cudaMemcpy(pauli_indices, pauli_host.data(), N * sizeof(int), cudaMemcpyHostToDevice); // Copying those values into GPU memory
 
-	for (int i = 0; i < N; i++)
-	{
-    	pauli_indices[i] = N;		// All indices are tagged with value N
-	}
 	do
 	{
 		srand(time(0));
@@ -278,9 +280,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		rndvecs<<<blocks,TPB>>>(r_d,pauli_indices,devStates_r,1,N);
 		rndvecs<<<blocks,TPB>>>(theta_d,pauli_indices,devStates_r,2,N);		//theta
 		rndvecs<<<blocks,TPB>>>(phi_d,pauli_indices,devStates_r,3,N);		//phi
-
-		curandState *devStates_p;
-		cudaMalloc(&devStates_p,N*sizeof(curandState));
 		
 		//p
 		srand(time(NULL)); 		// <---- check if this is necessary
@@ -293,23 +292,25 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		
 		sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); 		// Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 		sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); 		// Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
-		pauli_check<<<blocks,TPB>>>(r,check,N);
+		pauli_check<<<blocks,TPB>>>(r,pauli_indices,N);
 
-		for(int i=0;i<N;i++)
+		cudaMemcpy(pauli_host.data(), pauli_indices,N*sizeof(int), cudaMemcpyDeviceToHost);		// Copying those values into CPU memory
+
+		for(int i=0;i<N;i++)		// checking if all values are N+1, meaning no overlap.
 		{	
 
-			if(pauli_indices[i]==N+1)
+			if(pauli_host[i]==N+1)
 			{
 				check=0;
 			}
 			else
 			{
 				check=1;
-				cout<<"Loop"<<++loop<<"\n";
+				std::cout<<"Loop"<<++loop<<"\n";
 				break;
 			}
 		}
-	} (while check==1);
+	} while (check==1);
 
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
@@ -354,6 +355,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		myfile.close();
 	}
 
+	cudaFree(pauli_indices);
 	cudaFree(devStates_r);
 	cudaFree(r_d);
 	cudaFree(theta_d);
@@ -427,7 +429,7 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 
 
 
-__global__ void pauli_check(int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
+__global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
 { 
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	double r_coh = 3e-9;	 //coherence length
