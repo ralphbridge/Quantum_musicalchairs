@@ -310,6 +310,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 				break;
 			}
 		}
+		if loop>=100 break;
 	} while (check==1);
 
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
@@ -381,7 +382,7 @@ __global__ void rndvecs(double *vec,int *pauli_indices,curandState *globalState,
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
 
-	if((idx<n)&&((pauli_indices[idx]!=N+1)||(pauli_indices[idx]==N))) // run if indices are either N (first assignment of random positions) or not equal to N+1 (reassignments after coherent regions are found to be crossing
+	if((idx<n)&&(pauli_indices[idx]!=N+1)) // run if indices are either N (first assignment of random positions) or not equal to N+1 (reassignments after coherent regions are found to be crossing
 	{
 		if(opt==1)	// Random radii
 		{ 
@@ -409,14 +410,14 @@ __global__ void rndvecs(double *vec,int *pauli_indices,curandState *globalState,
 		{ 
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}
-		pauli_indices[idx]=N+1;		//Pauli_indices[idx] assigned to be N+1 and later sent for further testing of crossing coherence regions 
+		
 		globalState[idx]=localState; // Update current seed state
 	}
 }
 
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
-	if(idx<N){
+	if((idx<N)&&(pauli_indices[idx]!=N+1)){
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
@@ -424,6 +425,7 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
+		pauli_indices[idx]=N+1;		//Pauli_indices[idx] assigned to be N+1 and later sent for further testing of crossing coherence regions 
 	}
 }
 
