@@ -20,11 +20,25 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 ********************************************************************************
 */
 
+<<<<<<< HEAD
 #define N 10 // Number of electrons
 
 #define steps 1000 // Maximum allowed number of steps to kill simulation
 
 __device__ double dev_traj[10*steps*N]; // Record single paths (both positions and velocities)
+=======
+#define traj 0 // 1 for tracking trajectories, 0 for not tracking them
+
+#define N 1000 // Number of electrons
+
+#define steps 100000 // Maximum allowed number of steps to kill simulation
+
+#if traj==1
+	__device__ double dev_traj[13*steps*N]; // Record single paths (both positions and velocities)
+#else
+	__device__ double dev_traj[13*3*N]; // Only records initial and final values per particle
+#endif 
+>>>>>>> test
  
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -47,7 +61,11 @@ __constant__ double rmax; // Maximum spherical shell radius
 __constant__ double dt; // time step for the electron trajectory
 
 void onHost(); // Main CPU function
+<<<<<<< HEAD
 void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E_h,double *pos_h,double *mom_h); // Main GPU function
+=======
+void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom); // Main GPU function
+>>>>>>> test
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
@@ -58,6 +76,7 @@ __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
+<<<<<<< HEAD
 __device__ void my_push_back(double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,int const &idx){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
 	if(dev_count[idx]<steps){
 		dev_traj[10*steps*idx+10*dev_count[idx]]=x;
@@ -73,8 +92,51 @@ __device__ void my_push_back(double const &x,double const &y,double const &z,dou
 		dev_count[idx]=dev_count[idx]+1;
 	}else{
 		printf("Overflow error in pushback\n");
+=======
+#if traj==1
+	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+		if(dev_count[idx]<steps){
+			dev_traj[13*steps*idx+13*dev_count[idx]]=t;
+			dev_traj[13*steps*idx+13*dev_count[idx]+1]=x;
+			dev_traj[13*steps*idx+13*dev_count[idx]+2]=y;
+			dev_traj[13*steps*idx+13*dev_count[idx]+3]=z;
+			dev_traj[13*steps*idx+13*dev_count[idx]+4]=vx;
+			dev_traj[13*steps*idx+13*dev_count[idx]+5]=vy;
+			dev_traj[13*steps*idx+13*dev_count[idx]+6]=vz;
+			dev_traj[13*steps*idx+13*dev_count[idx]+7]=Ex;
+			dev_traj[13*steps*idx+13*dev_count[idx]+8]=Ey;
+			dev_traj[13*steps*idx+13*dev_count[idx]+9]=Ez;
+			dev_traj[13*steps*idx+13*dev_count[idx]+10]=Energy;
+			dev_traj[13*steps*idx+13*dev_count[idx]+11]=idx;
+			dev_traj[13*steps*idx+13*dev_count[idx]+12]=i;
+			dev_count[idx]=dev_count[idx]+1;
+		}else{
+			printf("Overflow error in pushback\n");
+		}
+>>>>>>> test
 	}
-}
+#else
+	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+		if(dev_count[idx]<3){
+			dev_traj[13*3*idx+13*dev_count[idx]]=t;
+			dev_traj[13*3*idx+13*dev_count[idx]+1]=x;
+			dev_traj[13*3*idx+13*dev_count[idx]+2]=y;
+			dev_traj[13*3*idx+13*dev_count[idx]+3]=z;
+			dev_traj[13*3*idx+13*dev_count[idx]+4]=vx;
+			dev_traj[13*3*idx+13*dev_count[idx]+5]=vy;
+			dev_traj[13*3*idx+13*dev_count[idx]+6]=vz;
+			dev_traj[13*3*idx+13*dev_count[idx]+7]=Ex;
+			dev_traj[13*3*idx+13*dev_count[idx]+8]=Ey;
+			dev_traj[13*3*idx+13*dev_count[idx]+9]=Ez;
+			dev_traj[13*3*idx+13*dev_count[idx]+10]=Energy;
+			dev_traj[13*3*idx+13*dev_count[idx]+11]=idx;
+			dev_traj[13*3*idx+13*dev_count[idx]+12]=i;
+			dev_count[idx]=dev_count[idx]+1;
+		}else{
+			printf("Overflow error in pushback\n");
+		}
+	}
+#endif
 
 int main(){
 	onHost();
@@ -93,10 +155,13 @@ void onHost(){
 
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
+<<<<<<< HEAD
 	char x_vec[80],x_vec_cart[80],E_vec[80];
 	strftime(x_vec,80,"initialconditions%b%d_%H_%M.txt",now);
 	strftime(x_vec_cart,80,"initialconditionscart%b%d_%H_%M.txt",now);
 	strftime(E_vec,80,"Efield%b%d_%H_%M.txt",now);
+=======
+>>>>>>> test
 
 	std::cout.precision(15);
 	std::ofstream myfile;
@@ -114,8 +179,11 @@ void onHost(){
 	double *p_h,*theta_p_h,*phi_p_h; // Initial momenta in spherical coordinates (N in total)
 	double *pos_h,*mom_h; // Cartesian variables (N in total for position and N in total for momentum)
 	double *E_h; // Electric field (just for debugging)
+<<<<<<< HEAD
 	/*double *v_init_h; // Initial transverse velocities, vector of size 3N
 	double *detector_h; // Single vector for the final positions, initial transverse velocities and final positions (6N in length for optimization purposes)*/
+=======
+>>>>>>> test
 
 	r_h=(double*)malloc(N*sizeof(double));
 	theta_h=(double*)malloc(N*sizeof(double));
@@ -132,6 +200,7 @@ void onHost(){
 	E_h=(double*)malloc(3*N*sizeof(double));
 
 	onDevice(r_h,theta_h,phi_h,p_h,theta_p_h,phi_p_h,E_h,pos_h,mom_h); // GPU function that computes the randomly generated positions
+<<<<<<< HEAD
 
 	myfile.open(x_vec);
 	if(myfile.is_open()){
@@ -159,11 +228,13 @@ void onHost(){
 		std::cout << '\n';
 		myfile.close();
 	}
+=======
+>>>>>>> test
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&elapsedTime,start,stop);
-	printf("Total time: %6.4f hours\n",elapsedTime*1e-3/3600.0);
+	printf("Total time: %6.4f minutes\n",elapsedTime*1e-3/60.0);
 	printf("------------------------------------------------------------\n");
 
 	free(r_h);
@@ -197,12 +268,19 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
+<<<<<<< HEAD
 	//double zdet_h=10e-2; // Detector position
 	double zdet_h=10e-6;
 
 	double rmin_h=0.0;
 	double rmax_h=1e-6;
 	//double rmax_h=rtip_h/10;
+=======
+	double zdet_h=25e-3;
+
+	double rmin_h=0.0;
+	double rmax_h=296e-9;
+>>>>>>> test
 
 	double dt_h=zdet_h/(10000*v0_h); // Think about time step
 
@@ -240,6 +318,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	printf("sigmathetap=%f rad\n",sigma_theta_p_h);
 
 	printf("dt=%2.6e s\n",dt_h);
+	printf("zdet=%2.6e s\n",zdet_h);
 	
 	printf("Threads per block: %d\n",TPB);
 	printf("Number of blocks: %d\n",blocks);
@@ -273,10 +352,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//phi
 	rndvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
 
-	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
-	
 	curandState *devStates_p;
 	cudaMalloc(&devStates_p,N*sizeof(curandState));
 	
@@ -292,7 +367,12 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	//phi_p
 	rndvecs<<<blocks,TPB>>>(phi_p_d,devStates_p,6,N);
+	
+	sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); // Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+	
+	sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); // Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 
+<<<<<<< HEAD
 	cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
@@ -312,6 +392,19 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	paths_euler<<<blocks,TPB>>>(r,p,E);
 
 	int dsizes=10*steps*N;
+=======
+	Efield<<<blocks,TPB>>>(r,E);
+
+	paths_euler<<<blocks,TPB>>>(r,p,E);
+
+	int dsizes;
+
+	if(traj==1){
+		dsizes=13*steps*N;
+	}else{
+		dsizes=13*3*N;
+	}
+>>>>>>> test
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
@@ -326,9 +419,15 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	myfile.open(filename_t);
 
 	if(myfile.is_open()){
+<<<<<<< HEAD
 		for(unsigned i=0;i<results.size()-1;i=i+10){
 			if(results[i]+results[i+1]!=0){
 				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << std::defaultfloat << static_cast<int>(results[i+9]) << '\n';
+=======
+		for(unsigned i=0;i<results.size()-1;i=i+13){
+			if(results[i]+results[i+1]!=0){ // To make sure no rows of zeroes from dev_traj make it to the trajectories file
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
+>>>>>>> test
 			}
 		}
 		std::cout << '\n';
@@ -368,11 +467,20 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 		}else if(opt==4){ // Random momenta magnitude
 			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
 			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
+<<<<<<< HEAD
 		}else if(opt==5){ // Random momentum polar angles
 			//vec[idx]=sigma_theta_p*curand_normal(&localState);
 			vec[idx]=pi*curand_uniform(&localState); // See comment two lines above
+=======
+			//vec[idx]=0;
+		}else if(opt==5){ // Random momentum polar angles
+			//vec[idx]=sigma_theta_p*curand_normal(&localState);
+			vec[idx]=pi*curand_uniform(&localState)-pi/2.0; // See comment two lines above
+			//vec[idx]=0;
+>>>>>>> test
 		}else if(opt==6){ // Random momentum azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
+			//vec[idx]=0;
 		}
 		globalState[idx]=localState; // Update current seed state
 	}
@@ -384,11 +492,15 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
+<<<<<<< HEAD
 			__syncthreads();
+=======
+>>>>>>> test
 			vec[3*idx+2]=rtip+rmax+r[idx]*cos(theta[idx]);
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
+<<<<<<< HEAD
 		/*if(idx==0){
 			vec[3*idx+1]=0.01*rmax;
 		}else{
@@ -397,6 +509,8 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		vec[3*idx]=0;
 		__syncthreads();
 		vec[3*idx+2]=rtip+rmax;*/
+=======
+>>>>>>> test
 	}
 }
 
@@ -411,20 +525,30 @@ __global__ void Efield(double *pos,double *E){
 	if(idx<N){
 		for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 483
 			if(i!=idx){
+<<<<<<< HEAD
 				__syncthreads();
 				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
 				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 				__syncthreads();
+=======
+				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
+				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
+>>>>>>> test
 				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
 			}
 		}
 		// Radial Electric field from the tip
+<<<<<<< HEAD
 		__syncthreads();
 		E[3*idx]=E[3*idx]+rtip*Vtip*pos[3*idx]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 		__syncthreads();
 		E[3*idx+1]=E[3*idx+1]+rtip*Vtip*pos[3*idx+1]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 		__syncthreads();
+=======
+		E[3*idx]=E[3*idx]+rtip*Vtip*pos[3*idx]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
+		E[3*idx+1]=E[3*idx+1]+rtip*Vtip*pos[3*idx+1]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
+>>>>>>> test
 		E[3*idx+2]=E[3*idx+2]+rtip*Vtip*pos[3*idx+2]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
 
 		// Electric field from the tip using method of images
@@ -463,8 +587,11 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 	}
 }
 */
+<<<<<<< HEAD
 
 //__global__ void paths_euler(double *k,double *angles,double *pos){
+=======
+>>>>>>> test
 __global__ void paths_euler(double *r,double *p,double *E){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
@@ -473,6 +600,7 @@ __global__ void paths_euler(double *r,double *p,double *E){
 	if(idx<N){
 		double tn=0.0;
 
+<<<<<<< HEAD
 		/*double vxn=p[3*idx]/m;
 		double vyn=p[3*idx+1]/m;
 		double vzn=p[3*idx+2]/m;*/
@@ -484,11 +612,45 @@ __global__ void paths_euler(double *r,double *p,double *E){
 
 		while(r[3*idx+2]<=zdet && iter<steps){
 			my_push_back(r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],idx);
+=======
+		double vxn=p[3*idx]/m;
+		double vyn=p[3*idx+1]/m;
+		double vzn=p[3*idx+2]/m;
+
+		//double R1,R2;
+		double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
+
+		for(int i=0;i<N;i++){
+			if(i!=idx){
+				Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
+			}
+		}
+		
+		Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
+
+		int halfway=0; // Variable used to store the first set of data when each electron crosses a zdet/10;
+		while(r[3*idx+2]<=zdet && iter<steps){
+			if(traj==1){
+				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+			}else if(iter==0){
+				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+			}else if(r[3*idx+2]>zdet/10.0 && halfway==0){
+				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+				halfway=1;
+			}
+>>>>>>> test
 
 			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
 			vyn=vyn+dt*q*E[3*idx+1]/m;
 			vzn=vzn+dt*q*E[3*idx+2]/m;
 
+<<<<<<< HEAD
+=======
+			E[3*idx]=0; // Initializing E filed at the particle position for each iteration
+			E[3*idx+1]=0;
+			E[3*idx+2]=0;
+
+>>>>>>> test
 			tn=tn+dt;
 
 			r[3*idx]=r[3*idx]+dt*vxn;
@@ -521,5 +683,12 @@ __global__ void paths_euler(double *r,double *p,double *E){
 			++iter;
 			__syncthreads();
 		}
+<<<<<<< HEAD
 	}
 }
+=======
+		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+	}
+}
+// Test Added line on Feb 13 to check merge
+>>>>>>> test
