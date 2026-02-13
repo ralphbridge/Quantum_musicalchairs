@@ -56,10 +56,17 @@ void onHost(); // Main CPU function
 void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
+<<<<<<< HEAD
 __global__ void rndvecs(double *x,curandState *state,int option,int n);
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new);
+=======
+__global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int option,int n);
+__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
+__global__ void Efield(double *pos,double *E);
+__global__ void pauli_check(double *pos, int *pauli_indices,int n);
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
@@ -176,7 +183,12 @@ void onHost(){
 	free(E_h);
 }
 
+<<<<<<< HEAD
 void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h){
+=======
+void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *theta_p_h,double *phi_p_h,double *E_h,double *pos_h,double *mom_h)
+{
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 	unsigned int blocks=(N+TPB-1)/TPB; // Check this line for optimization purposes
 
 	double pi_h=3.1415926535;
@@ -254,23 +266,69 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMalloc((void**)&p,3*N*sizeof(double));
 	
 	cudaMalloc((void**)&E,3*N*sizeof(double));
+<<<<<<< HEAD
 
+=======
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 	curandState *devStates_r;
 	cudaMalloc(&devStates_r,N*sizeof(curandState));
 
-	//r
-	srand(time(0));
-	int seed=rand(); //Setting up the seeds
-	setup_rnd<<<blocks,TPB>>>(devStates_r,seed);
+	curandState *devStates_p;
+	cudaMalloc(&devStates_p,N*sizeof(curandState));
 
-	rndvecs<<<blocks,TPB>>>(r_d,devStates_r,1,N);
+	int check;
+	int loop=0;
+	int *pauli_indices;
+	cudaMalloc((void**)&pauli_indices,N*sizeof(int));
+	std::vector<int> pauli_host(N, N);  // creates memory inside CPU for pauli_indices values. Here it is an N sized array with all entries being N
+	// All indices are tagged with value N for unassigned positions
+	
+	cudaMemcpy(pauli_indices, pauli_host.data(), N * sizeof(int), cudaMemcpyHostToDevice); // Copying those values into GPU memory
 
-	//theta
-	rndvecs<<<blocks,TPB>>>(theta_d,devStates_r,2,N);
+	do
+	{
+		srand(time(0));
+		int seed=rand(); //Setting up the seeds
+	
+		setup_rnd<<<blocks,TPB>>>(devStates_r,seed);
+	
+		rndvecs<<<blocks,TPB>>>(r_d,pauli_indices,devStates_r,1,N);
+		rndvecs<<<blocks,TPB>>>(theta_d,pauli_indices,devStates_r,2,N);		//theta
+		rndvecs<<<blocks,TPB>>>(phi_d,pauli_indices,devStates_r,3,N);		//phi
+		
+		//p
+		srand(time(NULL)); 		// <---- check if this is necessary
+		seed=rand();		 //Setting up the seeds <---- check if this is necessary
+		setup_rnd<<<blocks,TPB>>>(devStates_p,seed);
+	
+		rndvecs<<<blocks,TPB>>>(p_d,pauli_indices,devStates_p,4,N);
+		rndvecs<<<blocks,TPB>>>(theta_p_d,pauli_indices,devStates_p,5,N);		//theta_p
+		rndvecs<<<blocks,TPB>>>(phi_p_d,pauli_indices,devStates_p,6,N);		//phi_p
+		
+		sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); 		// Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+		sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); 		// Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
+		pauli_check<<<blocks,TPB>>>(r,pauli_indices,N);
 
-	//phi
-	rndvecs<<<blocks,TPB>>>(phi_d,devStates_r,3,N);
+		cudaMemcpy(pauli_host.data(), pauli_indices,N*sizeof(int), cudaMemcpyDeviceToHost);		// Copying those values into CPU memory
 
+		for(int i=0;i<N;i++)		// checking if all values are N+1, meaning no overlap.
+		{	
+
+			if(pauli_host[i]==N+1)
+			{
+				check=0;
+			}
+			else
+			{
+				check=1;
+				std::cout<<"Loop"<<++loop<<"\n";
+				break;
+			}
+		}
+		if loop>=100 break;
+	} while (check==1);
+
+<<<<<<< HEAD
 	curandState *devStates_p;
 	cudaMalloc(&devStates_p,N*sizeof(curandState));
 	
@@ -324,7 +382,52 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		std::cout << '\n';
 		myfile.close();
 	}
+=======
+	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(p_h,p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(theta_p_h,theta_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(phi_p_h,phi_p_d,N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
+	
+	Efield<<<blocks,TPB>>>(r,E);
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 
+	paths_euler<<<blocks,TPB>>>(r,p,E);
+
+	int dsizes;
+
+	if(traj==1){
+		dsizes=13*steps*N;
+	}else{
+		dsizes=13*3*N;
+	}
+
+	std::vector<double> results(dsizes);
+	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
+
+	time_t t=time(0);   // get time now
+	struct tm *now=localtime(&t);
+	char filename_t[80];
+	strftime (filename_t,80,"trajectories%b%d_%H_%M.txt",now);
+
+	std::cout.precision(15);
+	std::ofstream myfile;
+	myfile.open(filename_t);
+
+	if(myfile.is_open()){
+		for(unsigned i=0;i<results.size()-1;i=i+13){
+			if(results[i]+results[i+1]!=0){ // To make sure no rows of zeroes from dev_traj make it to the trajectories file
+				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
+			}
+		}
+		std::cout << '\n';
+		myfile.close();
+	}
+
+	cudaFree(pauli_indices);
 	cudaFree(devStates_r);
 	cudaFree(r_d);
 	cudaFree(theta_d);
@@ -345,14 +448,21 @@ __global__ void setup_rnd(curandState *state,unsigned long seed){
         curand_init(seed,idx,0,&state[idx]); // Initializes the random state
 }
 
-__global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // Random number generation
+__global__ void rndvecs(double *vec,int *pauli_indices,curandState *globalState,int opt,int n)		// Random number generation
+{ 
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
-	if(idx<n){
-		if(opt==1){ // Random radii
+
+	if((idx<n)&&(pauli_indices[idx]!=N+1)) // run if indices are either N (first assignment of random positions) or not equal to N+1 (reassignments after coherent regions are found to be crossing
+	{
+		if(opt==1)	// Random radii
+		{ 
 			vec[idx]=pow((pow(rmax,3.0)-pow(rmin,3.0))*curand_uniform(&localState)+pow(rmin,3.0),1.0/3.0);
-		}else if(opt==2){ // Random polar angles
+		}
+		else if(opt==2)		// Random polar angles
+		{ 
 			vec[idx]=acos(1.0-2.0*curand_uniform(&localState));
+<<<<<<< HEAD
 		}else if(opt==3){ // Random azimuthal angles
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 		}else if(opt==4){ // Random momenta magnitude
@@ -364,16 +474,40 @@ __global__ void rndvecs(double *vec,curandState *globalState,int opt,int n){ // 
 			vec[idx]=pi*curand_uniform(&localState)-pi/2.0; // See comment two lines above
 			//vec[idx]=0;
 		}else if(opt==6){ // Random momentum azimuthal angles
+=======
+		}
+		else if(opt==3)		// Random azimuthal angles
+		{ 
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 			vec[idx]=2.0*pi*curand_uniform(&localState);
 			//vec[idx]=0;
 		}
+		else if(opt==4)		// Random momenta magnitude
+		{ 
+			//vec[idx]=sigma_p*curand_normal(&localState); // Think about initial energy in the z direction
+			vec[idx]=sigma_p*curand_uniform(&localState); // Arjun said that he doesn't see why |p| should have any preference between 0 and 1eV
+		}
+		else if(opt==5) 		// Random momentum polar angles
+		{ 
+			//vec[idx]=sigma_theta_p*curand_normal(&localState);
+			vec[idx]=pi*curand_uniform(&localState); // See comment two lines above
+		}
+		else if(opt==6)			// Random momentum azimuthal angles
+		{ 
+			vec[idx]=2.0*pi*curand_uniform(&localState);
+		}
+		
 		globalState[idx]=localState; // Update current seed state
 	}
 }
 
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+<<<<<<< HEAD
 	if(idx<N){
+=======
+	if((idx<N)&&(pauli_indices[idx]!=N+1)){
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
 		vec[3*idx+1]=r[idx]*sin(theta[idx])*sin(phi[idx]);
 		if(opt==1){ // z coordinate adds constant offset to set origin of coordinates at the tip position
@@ -381,6 +515,32 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt
 		}else{
 			vec[3*idx+2]=r[idx]*cos(theta[idx]);
 		}
+<<<<<<< HEAD
+=======
+		pauli_indices[idx]=N+1;		//Pauli_indices[idx] assigned to be N+1 and later sent for further testing of crossing coherence regions 
+	}
+}
+
+
+
+__global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
+{ 
+	int idx=threadIdx.x+blockIdx.x*blockDim.x;
+	double r_coh = 3e-9;	 //coherence length
+	if(idx<n)
+	{
+		for (int i=0; i<n ;i++)
+		{
+    		if (i == idx) 
+			{
+				continue;
+			}
+			if((pow(pos[3*idx]-pos[3*i],2.0) + pow(pos[3*idx+1]-pos[3*i+1],2.0) + pow(pos[3*idx+2]-pos[3*i+2],2.0)) <= pow(r_coh,2.0))
+			{
+				pauli_indices[i]=i;
+			}
+		}
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 	}
 }
 
@@ -418,6 +578,7 @@ __global__ void Efield(double *pos,double *E){
 	}
 }
 
+<<<<<<< HEAD
 /*
 __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_new, double *theta_new, double *phi_new){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
@@ -441,6 +602,8 @@ __global__ void Pauli_blockade(double *pos,double *E, double *r_init, double *r_
 	}
 }
 */
+=======
+>>>>>>> Arjun-for-Pauli-Degeneracy-Compliance
 __global__ void paths_euler(double *r,double *p,double *E){
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 
