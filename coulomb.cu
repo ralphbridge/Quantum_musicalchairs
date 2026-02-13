@@ -57,7 +57,7 @@ void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,doub
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
 __global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int option,int n);
-__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
+__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pauli_indices,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void pauli_check(double *pos, int *pauli_indices,int n);
 __global__ void paths_euler(double *r,double *p,double *E);
@@ -290,8 +290,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		rndvecs<<<blocks,TPB>>>(theta_p_d,pauli_indices,devStates_p,5,N);		//theta_p
 		rndvecs<<<blocks,TPB>>>(phi_p_d,pauli_indices,devStates_p,6,N);		//phi_p
 		
-		sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,1); 		// Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
-		sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,0); 		// Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
+		sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,pauli_indices,1); 		// Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
+		sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,pauli_indices,0); 		// Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
 		pauli_check<<<blocks,TPB>>>(r,pauli_indices,N);
 
 		cudaMemcpy(pauli_host.data(), pauli_indices,N*sizeof(int), cudaMemcpyDeviceToHost);		// Copying those values into CPU memory
@@ -310,7 +310,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 				break;
 			}
 		}
-		if loop>=100 break;
+		if (loop>=100) break;
 	} while (check==1);
 
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
@@ -415,7 +415,7 @@ __global__ void rndvecs(double *vec,int *pauli_indices,curandState *globalState,
 	}
 }
 
-__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int opt){
+__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pauli_indices,int opt){
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	if((idx<N)&&(pauli_indices[idx]!=N+1)){
 		vec[3*idx]=r[idx]*sin(theta[idx])*cos(phi[idx]);
