@@ -24,6 +24,8 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define N 1000 // Number of electrons
 
+#define forces 3 // Coulomb ON Pauli OFF 1, Coulomb OFF Pauli ON 2, Coulomb ON Pauli ON 3
+
 #define steps 100000 // Maximum allowed number of steps to kill simulation
 
 #if traj==1
@@ -46,6 +48,9 @@ __constant__ double sigma_theta_p;
 __constant__ double Vtip; // Tip voltage
 __constant__ double rtip; // Tip radius of curvature
 __constant__ double zdet; // Detector position
+#if forces==3
+	__constant__ double rcoh; // Coherence length
+#endif
 
 __constant__ double rmin; // Minimum spherical shell radius
 __constant__ double rmax; // Maximum spherical shell radius
@@ -56,10 +61,17 @@ void onHost(); // Main CPU function
 void onDevice(double *r,double *theta,double *phi,double *p,double *theta_p,double *phi_p,double *E,double *pos,double *mom); // Main GPU function
 
 __global__ void setup_rnd(curandState *state,unsigned long seed); // Sets up seeds for the random number generation 
-__global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int option,int n);
-__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pauli_indices,int n);
+#if forces==3
+	__global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int option,int n);
+	__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pauli_indices,int n);
+	__global__ void pauli_check(double *pos,int *pauli_indices,int n);
+#elif forces==2
+	__global__ void rndvecs(double *x,curandState *state,int option,int n);
+	__global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int n);
+#endif
+
 __global__ void Efield(double *pos,double *E);
-__global__ void pauli_check(double *pos, int *pauli_indices,int n);
+
 __global__ void paths_euler(double *r,double *p,double *E);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
@@ -197,7 +209,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	double Vtip_h=-100; // Tip voltage
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
-	double zdet_h=25e-3;
+	double zdet_h=25e-3; // Detector position
+	if (forces==2 || forces==3){
+		double rcoh_h=3e-9; // Coherence length
+	}
 
 	double rmin_h=0.0;
 	double rmax_h=296e-9;
@@ -218,6 +233,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpyToSymbol(Vtip,&Vtip_h,sizeof(double));
 	cudaMemcpyToSymbol(rtip,&rtip_h,sizeof(double));
 	cudaMemcpyToSymbol(zdet,&zdet_h,sizeof(double));
+	if (forces==2 || forces==3){
+		cudaMemcpyToSymbol(rcoh,&rcoh_h,sizeof(double));
+	}
 
 	cudaMemcpyToSymbol(rmin,&rmin_h,sizeof(double));
 	cudaMemcpyToSymbol(rmax,&rmax_h,sizeof(double));
@@ -239,6 +257,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	printf("dt=%2.6e s\n",dt_h);
 	printf("zdet=%2.6e s\n",zdet_h);
+	if (forces==2 || forces==3){
+		printf("rcoh=%2.6e m",rcoh_h);
+	}
 	
 	printf("Threads per block: %d\n",TPB);
 	printf("Number of blocks: %d\n",blocks);
@@ -263,12 +284,13 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 	int check;
 	int loop=0;
-	int *pauli_indices;
-	cudaMalloc((void**)&pauli_indices,N*sizeof(int));
-	std::vector<int> pauli_host(N, N);  // creates memory inside CPU for pauli_indices values. Here it is an N sized array with all entries being N
+	if (forces==2 || forces==3){
+		int *pauli_indices;
+		cudaMalloc((void**)&pauli_indices,N*sizeof(int));
+		std::vector<int> pauli_host(N, N);  // creates memory inside CPU for pauli_indices values. Here it is an N sized array with all entries being N
 	// All indices are tagged with value N for unassigned positions
 	
-	cudaMemcpy(pauli_indices, pauli_host.data(), N * sizeof(int), cudaMemcpyHostToDevice); // Copying those values into GPU memory
+		cudaMemcpy(pauli_indices, pauli_host.data(), N * sizeof(int), cudaMemcpyHostToDevice); // Copying those values into GPU memory
 
 	do
 	{
@@ -292,7 +314,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		
 		sph2cart<<<blocks,TPB>>>(r,r_d,theta_d,phi_d,pauli_indices,1); 		// Building cartesian position vector (3N in size) out of GPU-located r,theta and phi vectors
 		sph2cart<<<blocks,TPB>>>(p,p_d,theta_p_d,phi_p_d,pauli_indices,0); 		// Building cartesian momenta vector (3N in size) out of GPU-located p,theta_p and phi_p vectors
-		pauli_check<<<blocks,TPB>>>(r,pauli_indices,N);
+		pauli_check<<<blocks,TPB>>>(r,pauli_indices,r_coh,N);
 
 		cudaMemcpy(pauli_host.data(), pauli_indices,N*sizeof(int), cudaMemcpyDeviceToHost);		// Copying those values into CPU memory
 
@@ -431,10 +453,10 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pa
 
 
 
-__global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
+__global__ void pauli_check(double *pos,int *pauli_indices,double *r_coh,int n) // If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
 { 
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
-	double r_coh = 3e-9;	 //coherence length
+	//double r_coh = 3e-9;	 //coherence length
 	if(idx<n)
 	{
 		for (int i=0; i<n ;i++)
