@@ -210,8 +210,9 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	//double Vtip_h=0; // Uncomment to turn off external electric field
 	double rtip_h=100e-9; // Tip radius of curvature
 	double zdet_h=25e-3; // Detector position
+	double rcoh_h = 0.0; // Coherence length, initialized to 0
 	if (forces==2 || forces==3){
-		double rcoh_h=3e-9; // Coherence length
+		rcoh_h=3e-9;
 	}
 
 	double rmin_h=0.0;
