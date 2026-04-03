@@ -434,7 +434,7 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pa
 __global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
 { 
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
-	double r_coh = 3e-9;	 //coherence length
+	double r_coh = 37e-9;	 //coherence length
 	if(idx<n)
 	{
 		for (int i=0; i<n ;i++)
