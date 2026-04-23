@@ -443,7 +443,7 @@ __global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th pa
 			{
 				continue;
 			}
-			if((pow(pos[3*idx]-pos[3*i],2.0) + pow(pos[3*idx+1]-pos[3*i+1],2.0) + pow(pos[3*idx+2]-pos[3*i+2],2.0)) <= pow(r_coh,2.0))
+			if((pow(pos[3*idx]-pos[3*i],2.0) + pow(pos[3*idx+1]-pos[3*i+1],2.0) + pow(pos[3*idx+2]-pos[3*i+2],2.0)) <= pow(r_coh,2.0))   // Change this to r_coh, no overlap at all between each others coherent volumes 
 			{
 				pauli_indices[i]=i;
 			}
