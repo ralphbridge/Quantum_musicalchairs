@@ -312,7 +312,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		}
 		if (loop>=100) break;
 	} while (check==1);
-
+	// Stop the entire code here to put out an error message saying n particles could not be fit in the sphere. Don't proceed further.
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
