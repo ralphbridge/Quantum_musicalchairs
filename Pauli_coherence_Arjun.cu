@@ -299,10 +299,6 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 				overlapping_nos=overlapping_nos + 1;
 				loop++;
 			}
-			if (loop>=100) 
-			{
-				break;
-			}
 		}
 		if (loop>=100) 
 		{
