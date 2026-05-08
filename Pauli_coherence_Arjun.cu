@@ -26,11 +26,8 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define steps 100000 // Maximum allowed number of steps to kill simulation
 
-#if traj==1
-	__device__ double dev_traj[13*steps*N]; // Record single paths (both positions and velocities)
-#else
-	__device__ double dev_traj[13*3*N]; // Only records initial and final values per particle
-#endif 
+
+__device__ double dev_traj[13*1*N]; // Only records initial values per particle
  
 __constant__ double pi;
 __constant__ double q; // electron charge
@@ -60,7 +57,7 @@ __global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int opt
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pauli_indices,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void pauli_check(double *pos, int *pauli_indices,int n);
-__global__ void paths_euler(double *r,double *p,double *E);
+__global__ void paths_euler(double *r,double *p,int *pauli_indices)
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
 
@@ -87,24 +84,19 @@ __device__ unsigned int dev_count[N]; // Global index that counts (per thread) i
 	}
 #else
 	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
-		if(dev_count[idx]<3){
-			dev_traj[13*3*idx+13*dev_count[idx]]=t;
-			dev_traj[13*3*idx+13*dev_count[idx]+1]=x;
-			dev_traj[13*3*idx+13*dev_count[idx]+2]=y;
-			dev_traj[13*3*idx+13*dev_count[idx]+3]=z;
-			dev_traj[13*3*idx+13*dev_count[idx]+4]=vx;
-			dev_traj[13*3*idx+13*dev_count[idx]+5]=vy;
-			dev_traj[13*3*idx+13*dev_count[idx]+6]=vz;
-			dev_traj[13*3*idx+13*dev_count[idx]+7]=Ex;
-			dev_traj[13*3*idx+13*dev_count[idx]+8]=Ey;
-			dev_traj[13*3*idx+13*dev_count[idx]+9]=Ez;
-			dev_traj[13*3*idx+13*dev_count[idx]+10]=Energy;
-			dev_traj[13*3*idx+13*dev_count[idx]+11]=idx;
-			dev_traj[13*3*idx+13*dev_count[idx]+12]=i;
-			dev_count[idx]=dev_count[idx]+1;
-		}else{
-			printf("Overflow error in pushback\n");
-		}
+		dev_traj[13*1*idx]=t;			// Edited from dev_traj[13*3*idx since I only want one column for initial positions. 
+		dev_traj[13*1*idx+1]=x;         // Removed the loop since I am not plotting three steps but just one.
+		dev_traj[13*1*idx+2]=y;         // Removed dev_count[idx] addition too cause again, just one step
+		dev_traj[13*1*idx+3]=z;
+		dev_traj[13*1*idx+4]=vx;
+		dev_traj[13*1*idx+5]=vy;
+		dev_traj[13*1*idx+6]=vz;
+		dev_traj[13*1*idx+7]=Ex;
+		dev_traj[13*1*idx+8]=Ey;
+		dev_traj[13*1*idx+9]=Ez;
+		dev_traj[13*1*idx+10]=Energy;
+		dev_traj[13*1*idx+11]=idx;
+		dev_traj[13*1*idx+12]=i;
 	}
 #endif
 
@@ -261,7 +253,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	curandState *devStates_p;
 	cudaMalloc(&devStates_p,N*sizeof(curandState));
 
-	int check;
+	int overlapping_nos=0;
 	int loop=0;
 	int *pauli_indices;
 	cudaMalloc((void**)&pauli_indices,N*sizeof(int));
@@ -298,21 +290,28 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 
 		for(int i=0;i<N;i++)		// checking if all values are N+1, meaning no overlap.
 		{	
-
 			if(pauli_host[i]==N+1)
 			{
-				check=0;
+				overlapping_nos=0;
 			}
 			else
 			{
-				check=1;
-				std::cout<<"Loop"<<++loop<<"\n";
+				overlapping_nos=overlapping_nos + 1;
+				loop++;
+			}
+			if (loop>=100) 
+			{
 				break;
 			}
 		}
-		if (loop>=100) break;
-	} while (check==1);
+		if (loop>=100) 
+		{
+			break;
+		}
+	} while (overlapping_nos!=0);
+
 	// Stop the entire code here to put out an error message saying n particles could not be fit in the sphere. Don't proceed further.
+
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(phi_h,phi_d,N*sizeof(double),cudaMemcpyDeviceToHost);
@@ -322,17 +321,10 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 	
-	Efield<<<blocks,TPB>>>(r,E);
-
-	paths_euler<<<blocks,TPB>>>(r,p,E);
-
+	paths_euler<<<blocks,TPB>>>(r,p,pauli_indices);       // Editing this part of the code to output only initial position, edited to remove the energy part cause no need for it 
 	int dsizes;
 
-	if(traj==1){
-		dsizes=13*steps*N;
-	}else{
-		dsizes=13*3*N;
-	}
+	dsizes=13*1*N;        // Edited from 13*3*N since I dont need 3 steps
 
 	std::vector<double> results(dsizes);
 	cudaMemcpyFromSymbol(&(results[0]),dev_traj,dsizes*sizeof(double));
@@ -340,17 +332,17 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	time_t t=time(0);   // get time now
 	struct tm *now=localtime(&t);
 	char filename_t[80];
-	strftime (filename_t,80,"trajectories%b%d_%H_%M.txt",now);
+	strftime (filename_t,80,"initialpositions%b%d_%H_%M.txt",now);
 
 	std::cout.precision(15);
 	std::ofstream myfile;
 	myfile.open(filename_t);
 
-	if(myfile.is_open()){
-		for(unsigned i=0;i<results.size()-1;i=i+13){
-			if(results[i]+results[i+1]!=0){ // To make sure no rows of zeroes from dev_traj make it to the trajectories file
-				myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
-			}
+	if(myfile.is_open())
+	{
+		for(unsigned i=0;i<results.size()-1;i=i+13)
+		{ 
+			myfile << std::scientific << results[i] << ',' << results[i+1] << ',' << results[i+2]  << ',' << results[i+3]  << ',' << results[i+4]  << ',' << results[i+5] << ',' << results[i+6] << ',' << results[i+7] << ',' << results[i+8] << ',' << results[i+9] << ',' << results[i+10] << ',' << std::defaultfloat << static_cast<int>(results[i+11]) << ',' << static_cast<int>(results[i+12]) << '\n';
 		}
 		std::cout << '\n';
 		myfile.close();
@@ -368,8 +360,8 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaFree(r);
 	cudaFree(p);
 	cudaFree(E);
-	cudaFree(dev_traj);
 	cudaFree(dev_count);
+	cudaFree(dev_traj);
 }
 
 __global__ void setup_rnd(curandState *state,unsigned long seed){
@@ -381,7 +373,6 @@ __global__ void rndvecs(double *vec,int *pauli_indices,curandState *globalState,
 { 
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	curandState localState=globalState[idx];
-
 	if((idx<n)&&(pauli_indices[idx]!=N+1)) // run if indices are either N (first assignment of random positions) or not equal to N+1 (reassignments after coherent regions are found to be crossing
 	{
 		if(opt==1)	// Random radii
@@ -430,20 +421,15 @@ __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pa
 }
 
 
-
 __global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
 { 
 	int idx=threadIdx.x+blockIdx.x*blockDim.x;
 	double r_coh = 37e-9;	 //coherence length
 	if(idx<n)
 	{
-		for (int i=0; i<n ;i++)
+		for (int i=idx+1; i<n ;i++)
 		{
-    		if (i == idx) 
-			{
-				continue;
-			}
-			if((pow(pos[3*idx]-pos[3*i],2.0) + pow(pos[3*idx+1]-pos[3*i+1],2.0) + pow(pos[3*idx+2]-pos[3*i+2],2.0)) <= pow(r_coh,2.0))   // Change this to r_coh, no overlap at all between each others coherent volumes 
+			if((pow(pos[3*idx]-pos[3*i],2.0) + pow(pos[3*idx+1]-pos[3*i+1],2.0) + pow(pos[3*idx+2]-pos[3*i+2],2.0)) <= pow(2*r_coh,2.0))   // Changed this to 2*r_coh, no overlap at all between each others coherent volumes 
 			{
 				pauli_indices[i]=i;
 			}
@@ -451,115 +437,25 @@ __global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th pa
 	}
 }
 
-__global__ void Efield(double *pos,double *E){
-	int idx=threadIdx.x+blockIdx.x*blockDim.x;
-
-	//double R1,R2;
-
-	E[3*idx]=0;
-	E[3*idx+1]=0;
-	E[3*idx+2]=0;
-	if(idx<N){
-		for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 483
-			if(i!=idx){
-				E[3*idx]=E[3*idx]+k*q*(pos[3*idx]-pos[3*i])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
-				E[3*idx+1]=E[3*idx+1]+k*q*(pos[3*idx+1]-pos[3*i+1])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
-				E[3*idx+2]=E[3*idx+2]+k*q*(pos[3*idx+2]-pos[3*i+2])/pow(pow(pos[3*idx]-pos[3*i],2.0)+pow(pos[3*idx+1]-pos[3*i+1],2.0)+pow(pos[3*idx+2]-pos[3*i+2],2.0),3.0/2.0);
-			}
-		}
-		// Radial Electric field from the tip
-		E[3*idx]=E[3*idx]+rtip*Vtip*pos[3*idx]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
-		E[3*idx+1]=E[3*idx+1]+rtip*Vtip*pos[3*idx+1]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
-		E[3*idx+2]=E[3*idx+2]+rtip*Vtip*pos[3*idx+2]/pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),3.0/2.0);
-
-		// Electric field from the tip using method of images
-		/*R1=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2],2.0),1.0/2.0);
-		__syncthreads();
-		R2=pow(pow(pos[3*idx],2.0)+pow(pos[3*idx+1],2.0)+pow(pos[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
-		__syncthreads();
-		E[3*idx]=E[3*idx]+Vtip*pos[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-		__syncthreads();
-		E[3*idx+1]=E[3*idx+1]+Vtip*pos[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-		__syncthreads();
-		E[3*idx+2]=E[3*idx+2]+Vtip*((pos[3*idx+2]-2.0*zdet)/pow(R1,3.0)-pos[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
-	}
-}
-
-__global__ void paths_euler(double *r,double *p,double *E){
+__global__ void paths_euler(double *r,double *p,int *pauli_indices)           // Edited to remove the stuff that are not needed
+{         
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
-
-	unsigned int iter=0;
-
-	if(idx<N){
+	if((idx<N)&&(pauli_indices[idx]==N+1))
+	{
 		double tn=0.0;
-
 		double vxn=p[3*idx]/m;
 		double vyn=p[3*idx+1]/m;
 		double vzn=p[3*idx+2]/m;
 
-		//double R1,R2;
-		double Energy=m*pow(pow(vxn,2.0)+pow(vyn,2.0)+pow(vzn,2.0),1.0/2.0)/2.0;
-
-		for(int i=0;i<N;i++){
-			if(i!=idx){
-				Energy=Energy+0.5*k*pow(q,2.0)*1.0/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),1.0/2.0);
-			}
-		}
-		
-		Energy=Energy+q*Vtip*rtip/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-
-		int halfway=0; // Variable used to store the first set of data when each electron crosses a zdet/10;
-		while(r[3*idx+2]<=zdet && iter<steps){
-			if(traj==1){
-				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-			}else if(iter==0){
-				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-			}else if(r[3*idx+2]>zdet/10.0 && halfway==0){
-				my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
-				halfway=1;
-			}
-
-			vxn=vxn+dt*q*E[3*idx]/m; // minus sign to account for the e charge
-			vyn=vyn+dt*q*E[3*idx+1]/m;
-			vzn=vzn+dt*q*E[3*idx+2]/m;
-
-			E[3*idx]=0; // Initializing E filed at the particle position for each iteration
-			E[3*idx+1]=0;
-			E[3*idx+2]=0;
-
-			tn=tn+dt;
-
-			r[3*idx]=r[3*idx]+dt*vxn;
-			r[3*idx+1]=r[3*idx+1]+dt*vyn;
-			r[3*idx+2]=r[3*idx+2]+dt*vzn;
-
-			for(int i=0;i<N;i++){ // Comment/uncomment this for cycle to disable/enable the Coulomb repulsion between charges, as well as in line 375
-				if(i!=idx && r[3*i+2]<zdet){
-					E[3*idx]=E[3*idx]+k*q*(r[3*idx]-r[3*i])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					E[3*idx+1]=E[3*idx+1]+k*q*(r[3*idx+1]-r[3*i+1])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-					E[3*idx+2]=E[3*idx+2]+k*q*(r[3*idx+2]-r[3*i+2])/pow(pow(r[3*idx]-r[3*i],2.0)+pow(r[3*idx+1]-r[3*i+1],2.0)+pow(r[3*idx+2]-r[3*i+2],2.0),3.0/2.0);
-				}
-			}
-			// Radial Electric field from the tip
-			E[3*idx]=E[3*idx]+rtip*Vtip*r[3*idx]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-			E[3*idx+1]=E[3*idx+1]+rtip*Vtip*r[3*idx+1]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-			E[3*idx+2]=E[3*idx+2]+rtip*Vtip*r[3*idx+2]/pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),3.0/2.0);
-
-			// Electric field from the tip using method of images
-			/*R1=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2],2.0),1.0/2.0);
-			__syncthreads();
-			R2=pow(pow(r[3*idx],2.0)+pow(r[3*idx+1],2.0)+pow(r[3*idx+2]-2.0*zdet,2.0),1.0/2.0);
-			__syncthreads();
-			E[3*idx]=E[3*idx]+Vtip*r[3*idx]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-			__syncthreads();
-			E[3*idx+1]=E[3*idx+1]+Vtip*r[3*idx+1]*(1.0/pow(R1,3.0)-1.0/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));
-			__syncthreads();
-			E[3*idx+2]=E[3*idx+2]+Vtip*((r[3*idx+2]-2.0*zdet)/pow(R1,3.0)-r[3*idx+2]/pow(R2,3.0))/(1.0/rtip-1.0/(2.0*zdet));*/
-
-			++iter;
-			__syncthreads();
-		}
-		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,E[3*idx],E[3*idx+1],E[3*idx+2],Energy,idx,iter);
+		my_push_back(tn,r[3*idx],r[3*idx+1],r[3*idx+2],vxn,vyn,vzn,0,0,0,0,idx,0);
+	}
+	if((idx<N)&&(pauli_indices[idx]!=N+1))
+	{
+		double tn=0.0;
+		double vxn=p[3*idx]/m;
+		double vyn=p[3*idx+1]/m;
+		double vzn=p[3*idx+2]/m;
+		my_push_back(6969,6969,6969,6969,6969,6969,6969,6969,6969,6969,6969,idx,overlapping_nos);		// Setting rows of overlapping particles to be all 6969 except the index number and the last number which tells me what are the ones that overlap and how many
 	}
 }
 // Testing Arjun's Unfathomable Genius
