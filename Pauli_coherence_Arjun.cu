@@ -57,48 +57,25 @@ __global__ void rndvecs(double *x, int *pauli_indices,curandState *state,int opt
 __global__ void sph2cart(double *vec,double *r,double *theta,double *phi,int *pauli_indices,int n);
 __global__ void Efield(double *pos,double *E);
 __global__ void pauli_check(double *pos, int *pauli_indices,int n);
-__global__ void paths_euler(double *r,double *p,int *pauli_indices)
+__global__ void paths_euler(double *r,double *p,int *pauli_indices, int overlapping_nos);
 
 __device__ unsigned int dev_count[N]; // Global index that counts (per thread) iteration steps
-
-#if traj==1
-	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
-		if(dev_count[idx]<steps){
-			dev_traj[13*steps*idx+13*dev_count[idx]]=t;
-			dev_traj[13*steps*idx+13*dev_count[idx]+1]=x;
-			dev_traj[13*steps*idx+13*dev_count[idx]+2]=y;
-			dev_traj[13*steps*idx+13*dev_count[idx]+3]=z;
-			dev_traj[13*steps*idx+13*dev_count[idx]+4]=vx;
-			dev_traj[13*steps*idx+13*dev_count[idx]+5]=vy;
-			dev_traj[13*steps*idx+13*dev_count[idx]+6]=vz;
-			dev_traj[13*steps*idx+13*dev_count[idx]+7]=Ex;
-			dev_traj[13*steps*idx+13*dev_count[idx]+8]=Ey;
-			dev_traj[13*steps*idx+13*dev_count[idx]+9]=Ez;
-			dev_traj[13*steps*idx+13*dev_count[idx]+10]=Energy;
-			dev_traj[13*steps*idx+13*dev_count[idx]+11]=idx;
-			dev_traj[13*steps*idx+13*dev_count[idx]+12]=i;
-			dev_count[idx]=dev_count[idx]+1;
-		}else{
-			printf("Overflow error in pushback\n");
-		}
-	}
-#else
-	__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i){ // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
-		dev_traj[13*1*idx]=t;			// Edited from dev_traj[13*3*idx since I only want one column for initial positions. 
-		dev_traj[13*1*idx+1]=x;         // Removed the loop since I am not plotting three steps but just one.
-		dev_traj[13*1*idx+2]=y;         // Removed dev_count[idx] addition too cause again, just one step
-		dev_traj[13*1*idx+3]=z;
-		dev_traj[13*1*idx+4]=vx;
-		dev_traj[13*1*idx+5]=vy;
-		dev_traj[13*1*idx+6]=vz;
-		dev_traj[13*1*idx+7]=Ex;
-		dev_traj[13*1*idx+8]=Ey;
-		dev_traj[13*1*idx+9]=Ez;
-		dev_traj[13*1*idx+10]=Energy;
-		dev_traj[13*1*idx+11]=idx;
-		dev_traj[13*1*idx+12]=i;
-	}
-#endif
+__device__ void my_push_back(double const t,double const &x,double const &y,double const &z,double const &vx,double const &vy,double const &vz,double const &Ex,double const &Ey,double const &Ez,double const &Energy,int const &idx,int const &i) // Function that loads positions and velocities into device memory per thread, I don't know why I put the variables as constants
+{	
+	dev_traj[13*1*idx]=t;			// Edited from dev_traj[13*3*idx since I only want one column for initial positions. 
+	dev_traj[13*1*idx+1]=x;         // Removed the loop since I am not plotting three steps but just one.
+	dev_traj[13*1*idx+2]=y;         // Removed dev_count[idx] addition too cause again, just one step
+	dev_traj[13*1*idx+3]=z;
+	dev_traj[13*1*idx+4]=vx;
+	dev_traj[13*1*idx+5]=vy;
+	dev_traj[13*1*idx+6]=vz;
+	dev_traj[13*1*idx+7]=Ex;
+	dev_traj[13*1*idx+8]=Ey;
+	dev_traj[13*1*idx+9]=Ez;
+	dev_traj[13*1*idx+10]=Energy;
+	dev_traj[13*1*idx+11]=idx;
+	dev_traj[13*1*idx+12]=i;
+}
 
 int main(){
 	onHost();
@@ -287,26 +264,19 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 		pauli_check<<<blocks,TPB>>>(r,pauli_indices,N);
 
 		cudaMemcpy(pauli_host.data(), pauli_indices,N*sizeof(int), cudaMemcpyDeviceToHost);		// Copying those values into CPU memory
-
+		overlapping_nos = 0;
 		for(int i=0;i<N;i++)		// checking if all values are N+1, meaning no overlap.
-		{	
-			if(pauli_host[i]==N+1)
-			{
-				overlapping_nos=0;
-			}
-			else
-			{
-				overlapping_nos=overlapping_nos + 1;
-				loop++;
-			}
+		{
+    		if(pauli_host[i] != N+1)
+    		{
+        		overlapping_nos++;
+    		}
 		}
 		if (loop>=100) 
 		{
 			break;
 		}
 	} while (overlapping_nos!=0);
-
-	// Stop the entire code here to put out an error message saying n particles could not be fit in the sphere. Don't proceed further.
 
 	cudaMemcpy(r_h,r_d,N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(theta_h,theta_d,N*sizeof(double),cudaMemcpyDeviceToHost);
@@ -317,7 +287,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
 	cudaMemcpy(pos_h,r,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 	cudaMemcpy(mom_h,p,3*N*sizeof(double),cudaMemcpyDeviceToHost);
 	
-	paths_euler<<<blocks,TPB>>>(r,p,pauli_indices);       // Editing this part of the code to output only initial position, edited to remove the energy part cause no need for it 
+	paths_euler<<<blocks,TPB>>>(r,p,pauli_indices,overlapping_nos);       // Editing this part of the code to output only initial position, edited to remove the energy part cause no need for it 
 	int dsizes;
 
 	dsizes=13*1*N;        // Edited from 13*3*N since I dont need 3 steps
@@ -433,7 +403,7 @@ __global__ void pauli_check(double *pos,int *pauli_indices,int n)		// If i'th pa
 	}
 }
 
-__global__ void paths_euler(double *r,double *p,int *pauli_indices)           // Edited to remove the stuff that are not needed
+__global__ void paths_euler(double *r,double *p,int *pauli_indices, int overlapping_nos)           // Edited to remove the stuff that are not needed
 {         
 	unsigned int idx=threadIdx.x+blockIdx.x*TPB;
 	if((idx<N)&&(pauli_indices[idx]==N+1))
@@ -447,10 +417,6 @@ __global__ void paths_euler(double *r,double *p,int *pauli_indices)           //
 	}
 	if((idx<N)&&(pauli_indices[idx]!=N+1))
 	{
-		double tn=0.0;
-		double vxn=p[3*idx]/m;
-		double vyn=p[3*idx+1]/m;
-		double vzn=p[3*idx+2]/m;
 		my_push_back(6969,6969,6969,6969,6969,6969,6969,6969,6969,6969,6969,idx,overlapping_nos);		// Setting rows of overlapping particles to be all 6969 except the index number and the last number which tells me what are the ones that overlap and how many
 	}
 }
