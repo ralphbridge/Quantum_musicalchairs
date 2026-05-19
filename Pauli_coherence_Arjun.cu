@@ -270,6 +270,7 @@ void onDevice(double *r_h,double *theta_h,double *phi_h,double *p_h,double *thet
     		if(pauli_host[i] != N+1)
     		{
         		overlapping_nos++;
+				loop++;
     		}
 		}
 		if (loop>=100) 
