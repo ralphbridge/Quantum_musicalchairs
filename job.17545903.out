@@ -1,0 +1,14 @@
+The current time is Sun Aug 16 19:17:58 2026
+Coulomb explosion
+Number of particles (N): 500
+r_min=0.000000e+00 m
+r_max=2.960000e-07 m
+sigmap=5.400000e-25 kg*m/s
+sigmathetap=0.010000 rad
+dt=2.272727e-13 s
+zdet=2.500000e-02 s
+Threads per block: 256
+Number of blocks: 2
+
+Total time: 0.0030 minutes
+------------------------------------------------------------
