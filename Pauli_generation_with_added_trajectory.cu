@@ -297,13 +297,13 @@ void onDevice(double* r_h, double* theta_h, double* phi_h, double* p_h, double* 
 
 	cudaMemcpy(pauli_indices, pauli_host.data(), N * sizeof(int), cudaMemcpyHostToDevice); // Copying those values into GPU memory
 
+	unsigned long seed_r = time(NULL);
+	unsigned long seed_p = seed_r + 1;
+
+	setup_rnd<<<blocks, TPB>>>(devStates_r, seed_r);
+	setup_rnd<<<blocks, TPB>>>(devStates_p, seed_p);
 	do
 	{
-		srand(time(0));
-		int seed = rand(); //Setting up the seeds
-
-		setup_rnd << <blocks, TPB >> > (devStates_r, seed);
-
 		rndvecs << <blocks, TPB >> > (r_d, pauli_indices, devStates_r, 1, N);
 		rndvecs << <blocks, TPB >> > (theta_d, pauli_indices, devStates_r, 2, N);		//theta
 		rndvecs << <blocks, TPB >> > (phi_d, pauli_indices, devStates_r, 3, N);		//phi
