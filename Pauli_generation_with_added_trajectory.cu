@@ -22,7 +22,7 @@ Euler:	31 4-Byte registers, 24 Bytes of shared memory per thread. 1080Ti => 100.
 
 #define traj 0 // 1 for tracking trajectories, 0 for not tracking them
 
-#define N 10 // Number of electrons
+#define N 500 // Number of electrons
 
 #define steps 100000 // Maximum allowed number of steps to kill simulation
 
@@ -51,6 +51,7 @@ __constant__ double zdet; // Detector position
 
 __constant__ double rmin; // Minimum spherical shell radius
 __constant__ double rmax; // Maximum spherical shell radius
+__constant__ double rcoh; // Coherence length
 
 __constant__ double dt; // time step for the electron trajectory
 
@@ -227,6 +228,7 @@ void onDevice(double* r_h, double* theta_h, double* phi_h, double* p_h, double* 
 
 	double rmin_h = 0.0;
 	double rmax_h = 296e-9;
+	double rcoh_h = 37e-9; // Coherence length
 
 	double dt_h = zdet_h / (10000 * v0_h); // Think about time step
 
@@ -247,6 +249,7 @@ void onDevice(double* r_h, double* theta_h, double* phi_h, double* p_h, double* 
 
 	cudaMemcpyToSymbol(rmin, &rmin_h, sizeof(double));
 	cudaMemcpyToSymbol(rmax, &rmax_h, sizeof(double));
+	cudaMemcpyToSymbol(rcoh, &rcoh_h, sizeof(double));
 
 	cudaMemcpyToSymbol(dt, &dt_h, sizeof(double));
 
@@ -491,12 +494,11 @@ __global__ void sph2cart(double* vec, double* r, double* theta, double* phi, int
 __global__ void pauli_check(double* pos, int* pauli_indices, int n)		// If i'th particle is within coherent region of idx'th particle, pauli_index[i]=i
 {
 	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	double r_coh = 37e-9;	 //coherence length
 	if (idx < n)
 	{
 		for (int i = idx + 1; i < n;i++)
 		{
-			if ((pow(pos[3 * idx] - pos[3 * i], 2.0) + pow(pos[3 * idx + 1] - pos[3 * i + 1], 2.0) + pow(pos[3 * idx + 2] - pos[3 * i + 2], 2.0)) <= pow(2 * r_coh, 2.0))   // Changed this to 2*r_coh, no overlap at all between each others coherent volumes 
+			if ((pow(pos[3 * idx] - pos[3 * i], 2.0) + pow(pos[3 * idx + 1] - pos[3 * i + 1], 2.0) + pow(pos[3 * idx + 2] - pos[3 * i + 2], 2.0)) <= pow(2 * rcoh, 2.0))   // Changed this to 2*rcoh, no overlap at all between each others coherent volumes 
 			{
 				pauli_indices[i] = i;
 			}
