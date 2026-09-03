@@ -7,5 +7,5 @@
 #SBATCH --error=/work/batelaan/rpuente/Quantum_musicalchairs/job.%J.err
 #SBATCH --output=/work/batelaan/rpuente/Quantum_musicalchairs/job.%J.out
 
-module load cuda
+module load cuda/12.4
 ./cuda_coulomb_arjun
