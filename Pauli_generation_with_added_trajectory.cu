@@ -228,7 +228,7 @@ void onDevice(double* r_h, double* theta_h, double* phi_h, double* p_h, double* 
 
 	double rmin_h = 0.0;
 	double rmax_h = 296e-9;
-	double rcoh_h = 37e-9; // Coherence length
+	double rcoh_h = 3.7e-9; // Coherence length
 
 	double dt_h = zdet_h / (10000 * v0_h); // Think about time step
 
@@ -313,8 +313,8 @@ void onDevice(double* r_h, double* theta_h, double* phi_h, double* p_h, double* 
 
 		//p
 		srand(time(NULL)); 		// <---- check if this is necessary
-		seed = rand();		 //Setting up the seeds <---- check if this is necessary
-		setup_rnd << <blocks, TPB >> > (devStates_p, seed);
+		seed_p = rand();		 //Setting up the seeds <---- check if this is necessary
+		setup_rnd << <blocks, TPB >> > (devStates_p, seed_p);
 
 		rndvecs << <blocks, TPB >> > (p_d, pauli_indices, devStates_p, 4, N);
 		rndvecs << <blocks, TPB >> > (theta_p_d, pauli_indices, devStates_p, 5, N);		//theta_p
